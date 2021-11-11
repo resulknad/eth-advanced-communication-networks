@@ -7,3 +7,8 @@ This repository contains all the group-specific files required to run the AdvNet
 - The link, failure, and traffic inputs, in `inputs`.
 
 For the project documentation, refer to: https://gitlab.ethz.ch/nsg/public/adv-net-2021-project/-/blob/main/README.md
+
+## Links
+
+* Project Description: https://gitlab.ethz.ch/nsg/public/adv-net-2021-project
+* Input Pool: https://gitlab.ethz.ch/nsg/public/adv-net-2021-project-inputpool

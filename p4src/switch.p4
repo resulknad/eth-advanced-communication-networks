@@ -74,6 +74,7 @@ control MyEgress(inout headers hdr,
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
     apply {
+        // we decrease the TTL, thus we have to update the IPv4 checksum
         update_checksum(
             hdr.ipv4.isValid(),
             {

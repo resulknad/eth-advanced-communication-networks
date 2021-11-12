@@ -6,6 +6,7 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> PROTOCOL_TCP = 0x6;
+const bit<8> PROTOCOL_UDP = 0x11;
 
 
 // Define headers
@@ -36,7 +37,7 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
-header tcp_t{
+header tcp_t {
     bit<16> srcPort;
     bit<16> dstPort;
     bit<32> seqNo;
@@ -56,6 +57,13 @@ header tcp_t{
     bit<16> urgentPtr;
 }
 
+header udp_t {
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<16> len;
+    bit<16> checksum;
+}
+
 
 // Instantiate metadata fields
 struct metadata {
@@ -67,5 +75,6 @@ struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
     tcp_t        tcp;
+    udp_t        udp;
 }
 

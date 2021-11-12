@@ -23,12 +23,18 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
             PROTOCOL_TCP: parse_tcp;
+            PROTOCOL_UDP: parse_udp;
             default: accept;
         }
     }
 
     state parse_tcp {
         packet.extract(hdr.tcp);
+        transition accept;
+    }
+
+    state parse_udp {
+        packet.extract(hdr.udp);
         transition accept;
     }
 
@@ -44,6 +50,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);
+        packet.emit(hdr.udp);
 
     }
 }

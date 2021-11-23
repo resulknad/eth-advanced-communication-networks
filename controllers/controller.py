@@ -5,7 +5,7 @@ from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 
 class Controller(object):
 
-    def __init__(self, base_traffic):
+    def __init__(self, base_traffic, slas):
         self.base_traffic_file = base_traffic
         self.topo = load_topo('topology.json')
         self.controllers = {}
@@ -69,11 +69,11 @@ class Controller(object):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--base-traffic', help='Path to scenario.base-traffic',
-                        type=str, required=False, default='')
+    type=str, required=False, default='')
+    parser.add_argument('--slas', help='Path to scenario.slas',
+    type=str, required=False, default='')
     return parser.parse_args()
-
 
 if __name__ == "__main__":
     args = get_args()
-    controller = Controller(args.base_traffic)
-    controller.main()
+    controller = Controller(args.base_traffic, args.slas).main()

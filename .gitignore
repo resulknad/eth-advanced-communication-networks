@@ -1,0 +1,5 @@
+p4src/switch.p4i
+p4src/switch.json
+
+__pycache__/
+tmp/

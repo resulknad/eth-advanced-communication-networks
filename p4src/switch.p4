@@ -22,8 +22,37 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    apply {
+    action drop() {
+        mark_to_drop(standard_metadata);
+    }
 
+    action set_nhop(macAddr_t dstAddr, egressSpec_t port) {
+        // set the src mac address as the previous dst
+        // TODO: this is not what happens in reality
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+
+        hdr.ethernet.dstAddr = dstAddr;
+        standard_metadata.egress_spec = port;
+
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+    }
+
+    table ipv4_lpm {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            set_nhop;
+            drop;
+        }
+        size = 1024;    // TODO: we don't need that many entries
+        default_action = drop;
+    }
+
+    apply {
+        if (hdr.ipv4.isValid()) {
+            ipv4_lpm.apply();
+        }
     }
 }
 
@@ -44,8 +73,27 @@ control MyEgress(inout headers hdr,
 *************************************************************************/
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
-     apply {
-
+    apply {
+        // we decrease the TTL, thus we have to update the IPv4 checksum
+        update_checksum(
+            hdr.ipv4.isValid(),
+            {
+                hdr.ipv4.version,
+                hdr.ipv4.ihl,
+                hdr.ipv4.dscp,
+                hdr.ipv4.ecn,
+                hdr.ipv4.totalLen,
+                hdr.ipv4.identification,
+                hdr.ipv4.flags,
+                hdr.ipv4.fragOffset,
+                hdr.ipv4.ttl,
+                hdr.ipv4.protocol,
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr
+            },
+            hdr.ipv4.hdrChecksum,
+            HashAlgorithm.csum16
+        );
     }
 }
 

@@ -80,7 +80,8 @@ header udp_t {
 
 // Instantiate metadata fields
 struct metadata {
-
+    bit<14> ecmp_hash;
+    bit<14> ecmp_group_id;
 }
 
 // Instantiate packet headers

@@ -32,10 +32,19 @@ class Controller(object):
     def run(self):
         """Run function"""
 
+        ecmp_group_counters = {}
+
+        # initialize the counters
+        for sw_name in self.topo.get_p4switches():
+            ecmp_group_counters[sw_name] = 0
+
         for (sw_name, controller), dst_sw_name in product(self.controllers.items(), self.topo.get_p4switches()):
-            # if it's ourselves, install table entry for the directly connected host and for MPLS forwarding
+
+            # do the following only once per switch (i.e., when the destination is ourselves)
             if sw_name == dst_sw_name:
-                # there should only be one host, but let's keep it generic
+
+                # install table entry for the directly connected hosts
+                # (there should only be one host, but let's keep it generic)
                 for host in self.topo.get_hosts_connected_to(sw_name):
                     port_num = self.topo.node_to_node_port_num(sw_name, host)
                     host_ip = self.topo.get_host_ip(host) + '/32'
@@ -43,8 +52,9 @@ class Controller(object):
 
                     # add rule
                     print(f'table_add at {sw_name}')
-                    self.controllers[sw_name].table_add('FEC_tbl', 'set_nhop', [str(host_ip)], [str(host_mac), str(port_num)])
+                    self.controllers[sw_name].table_add('ipv4_lpm', 'set_nhop', [str(host_ip)], [str(host_mac), str(port_num)])
 
+                # install table entries for MPLS forwarding
                 for neighbor in self.topo.get_switches_connected_to(sw_name):
                     port_num = self.topo.node_to_node_port_num(sw_name, neighbor)
                     neighbor_mac = self.topo.node_to_node_mac(neighbor, sw_name)
@@ -60,19 +70,34 @@ class Controller(object):
             # check if there are directly connected hosts
             # (we know there is one for each switch, but let's keep it generic)
             elif self.topo.get_hosts_connected_to(dst_sw_name):
-                shortest_path = self.topo.get_shortest_paths_between_nodes(sw_name, dst_sw_name)[0]
-                labels = self.get_mpls_stack(shortest_path)
-                num_hops = len(labels)
+                shortest_paths = self.topo.get_shortest_paths_between_nodes(sw_name, dst_sw_name)
 
-                action_name = f'mpls_ingress_{num_hops}_hop'
-                action_args = list(map(str, labels[::-1]))
+                print(f'shortest paths: {shortest_paths}')
+
+                num_shortest_paths = len(shortest_paths)
+                num_hops = len(shortest_paths[0]) - 1
 
                 for host in self.topo.get_hosts_connected_to(dst_sw_name):
                     host_ip = self.topo.get_host_ip(host) + '/32'
 
-                    # add rule
+                    # install entry in ipv4_lpm table
                     print(f'table_add at {sw_name}')
-                    self.controllers[sw_name].table_add('FEC_tbl', action_name, [str(host_ip)], action_args)
+                    self.controllers[sw_name].table_add('ipv4_lpm', 'ecmp_group', [str(host_ip)], [str(ecmp_group_counters[sw_name]), str(num_shortest_paths)])
+
+                    # install entry in ecmp_FEC_tbl
+                    for idx, path in enumerate(shortest_paths):
+
+                        labels = self.get_mpls_stack(path)
+                        assert len(labels) == num_hops, 'shortest paths of different lengths!'
+
+                        action_name = f'mpls_ingress_{num_hops}_hop'
+                        action_args = list(map(str, labels[::-1]))
+
+                        # add rule
+                        print(f'table_add at {sw_name}')
+                        self.controllers[sw_name].table_add('ecmp_FEC_tbl', action_name, [str(ecmp_group_counters[sw_name]), str(idx)], action_args)
+
+                    ecmp_group_counters[sw_name] += 1
 
     def get_mpls_stack(self, path) -> List[int]:
         """

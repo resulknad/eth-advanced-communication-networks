@@ -45,6 +45,40 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
+    action ecmp_group(bit<14> ecmp_group_id, bit<16> num_nhops){
+        // TODO: v1model disallows conditionals in actions.
+        // Thus, we ignore transport protocol for now (but this means the decision is not based on the flow,
+        // but only based src and dst ips)
+        hash(meta.ecmp_hash,
+            HashAlgorithm.crc16,
+            (bit<1>)0,
+            {
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr,
+                //hdr.tcp.srcPort,
+                //hdr.tcp.dstPort,
+                hdr.ipv4.protocol
+            },
+            num_nhops
+        );
+
+	    meta.ecmp_group_id = ecmp_group_id;
+    }
+
+
+    table ipv4_lpm {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            set_nhop;
+            ecmp_group;
+            drop;
+        }
+        default_action = drop;
+        size = 256;
+    }
+
     action mpls_ingress_1_hop(label_t l1) {
         hdr.ethernet.etherType = TYPE_MPLS;
         mpls_push(l1, 1, hdr);
@@ -126,12 +160,12 @@ control MyIngress(inout headers hdr,
         mpls_push(l16, 0, hdr);
     }
 
-    table FEC_tbl {
+    table ecmp_FEC_tbl {
         key = {
-            hdr.ipv4.dstAddr: lpm;
+            meta.ecmp_group_id: exact;
+            meta.ecmp_hash: exact;
         }
         actions = {
-            set_nhop;
             mpls_ingress_1_hop;
             mpls_ingress_2_hop;
             mpls_ingress_3_hop;
@@ -197,7 +231,11 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.ipv4.isValid() && !hdr.mpls[0].isValid()) {
-            FEC_tbl.apply();
+            switch (ipv4_lpm.apply().action_run) {
+                ecmp_group: {
+                    ecmp_FEC_tbl.apply();
+                }
+            }
         }
         if (hdr.mpls[0].isValid()) {
             mpls_tbl.apply();

@@ -85,6 +85,13 @@ struct metadata {
 
     bit<16> srcPort;
     bit<16> dstPort;
+
+    // flowlet switching
+    bit<48> flowlet_last_stamp;
+    bit<48> flowlet_time_diff;
+    bit<13> flowlet_register_index;
+    bit<16> flowlet_id;
+
 }
 
 // Instantiate packet headers

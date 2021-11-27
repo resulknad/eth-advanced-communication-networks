@@ -6,6 +6,12 @@
 #include "include/headers.p4"
 #include "include/parsers.p4"
 
+// Flowlet switching parameters
+#define REGISTER_SIZE 8192
+#define TIMESTAMP_WIDTH 48
+#define ID_WIDTH 16
+#define FLOWLET_TIMEOUT 48w200000
+
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -30,9 +36,47 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
+    register<bit<ID_WIDTH>>(REGISTER_SIZE) flowlet_to_id;
+    register<bit<TIMESTAMP_WIDTH>>(REGISTER_SIZE) flowlet_time_stamp;
+
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
+
+    action read_flowlet_registers(){
+
+        //compute register index
+        hash(meta.flowlet_register_index,
+            HashAlgorithm.crc16,
+            (bit<16>)0,
+            {
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr,
+                meta.srcPort,
+                meta.dstPort,
+                hdr.ipv4.protocol
+            },
+            (bit<14>)8192
+        );
+
+        // read previous time stamp
+        flowlet_time_stamp.read(meta.flowlet_last_stamp, (bit<32>)meta.flowlet_register_index);
+
+        // read previous flowlet id
+        flowlet_to_id.read(meta.flowlet_id, (bit<32>)meta.flowlet_register_index);
+
+        // update timestamp
+        flowlet_time_stamp.write((bit<32>)meta.flowlet_register_index, standard_metadata.ingress_global_timestamp);
+    }
+
+    action update_flowlet_id(){
+        bit<32> random_t;
+        random(random_t, (bit<32>)0, (bit<32>)65000);
+        meta.flowlet_id = (bit<16>)random_t;
+        flowlet_to_id.write((bit<32>)meta.flowlet_register_index, (bit<16>)meta.flowlet_id);
+    }
+
 
     action set_nhop(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
@@ -56,7 +100,9 @@ control MyIngress(inout headers hdr,
                 hdr.ipv4.dstAddr,
                 meta.srcPort,
                 meta.dstPort,
-                hdr.ipv4.protocol
+                hdr.ipv4.protocol,
+                // add flowlet id as a "salt"
+                meta.flowlet_id
             },
             num_nhops
         );
@@ -265,6 +311,16 @@ control MyIngress(inout headers hdr,
                 // avoid undefined behavior (e.g., for ICMP packets)
                 meta.srcPort = 0;
                 meta.dstPort = 0;
+            }
+
+            @atomic {
+                read_flowlet_registers();
+                meta.flowlet_time_diff = standard_metadata.ingress_global_timestamp - meta.flowlet_last_stamp;
+
+                // check if a new flowlet starts
+                if (meta.flowlet_time_diff > FLOWLET_TIMEOUT){
+                    update_flowlet_id();
+                }
             }
 
             switch (ipv4_lpm.apply().action_run) {

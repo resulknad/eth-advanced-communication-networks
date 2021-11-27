@@ -46,17 +46,16 @@ control MyIngress(inout headers hdr,
     }
 
     action ecmp_group(bit<14> ecmp_group_id, bit<16> num_nhops){
-        // TODO: v1model disallows conditionals in actions.
-        // Thus, we ignore transport protocol for now (but this means the decision is not based on the flow,
-        // but only based src and dst ips)
+        // note that we need to extract the ports into metadata fields (conditional on the transport protocol)
+        // in the apply { } block because v1model disallows conditionals in actions
         hash(meta.ecmp_hash,
             HashAlgorithm.crc16,
             (bit<1>)0,
             {
                 hdr.ipv4.srcAddr,
                 hdr.ipv4.dstAddr,
-                //hdr.tcp.srcPort,
-                //hdr.tcp.dstPort,
+                meta.srcPort,
+                meta.dstPort,
                 hdr.ipv4.protocol
             },
             num_nhops
@@ -229,8 +228,26 @@ control MyIngress(inout headers hdr,
         size = CONST_MAX_LABELS * 2;
     }
 
+    action get_tcp_ports() {
+        meta.srcPort = hdr.tcp.srcPort;
+        meta.dstPort = hdr.tcp.dstPort;
+    }
+
+    action get_udp_ports() {
+        meta.srcPort = hdr.udp.srcPort;
+        meta.dstPort = hdr.udp.dstPort;
+    }
+
     apply {
         if (hdr.ipv4.isValid() && !hdr.mpls[0].isValid()) {
+
+            // read ports into metadata
+            if (hdr.tcp.isValid()) {
+                get_tcp_ports();
+            } else if (hdr.udp.isValid()) {
+                get_udp_ports();
+            }
+
             switch (ipv4_lpm.apply().action_run) {
                 ecmp_group: {
                     ecmp_FEC_tbl.apply();

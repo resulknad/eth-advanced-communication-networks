@@ -82,6 +82,9 @@ header udp_t {
 struct metadata {
     bit<14> ecmp_hash;
     bit<14> ecmp_group_id;
+
+    bit<16> srcPort;
+    bit<16> dstPort;
 }
 
 // Instantiate packet headers

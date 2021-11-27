@@ -339,6 +339,7 @@ control MyIngress(inout headers hdr,
                 // avoid undefined behavior (e.g., for ICMP packets)
                 meta.srcPort = 0;
                 meta.dstPort = 0;
+                get_random_flowlet_id();
             }
 
             switch (ipv4_lpm.apply().action_run) {

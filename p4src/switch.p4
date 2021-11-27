@@ -61,10 +61,16 @@ control MyIngress(inout headers hdr,
             num_nhops
         );
 
-	    meta.ecmp_group_id = ecmp_group_id;
+        meta.ecmp_group_id = ecmp_group_id;
     }
 
-
+    /*
+     * This table is the first one to be applied.
+     * - For directly connected hosts, it should contain the set_nhop action to forward based on IPv4.
+     * - For ingress switches, it should contain the ecmp_group action, which sets the ecmp_group_id (an 
+     *   identifier of the set of paths to a particular destination) and the ecmp_hash (an index into this
+     *   set based on the flow 5-tuple).
+     */
     table ipv4_lpm {
         key = {
             hdr.ipv4.dstAddr: lpm;
@@ -159,6 +165,10 @@ control MyIngress(inout headers hdr,
         mpls_push(l16, 0, hdr);
     }
 
+    /*
+     * This table maps the selected path (identified by the ecmp_group_id and ecmp_hash) to the actual
+     * path in the form of a label stack.
+     */
     table ecmp_FEC_tbl {
         key = {
             meta.ecmp_group_id: exact;
@@ -214,6 +224,10 @@ control MyIngress(inout headers hdr,
         hdr.mpls.pop_front(1);
     }
 
+    /*
+     * This table handles the forwarding of MPLS packets.
+     * The handling is slightly different for MPLS egress switches, where the last MPLS header is popped.
+     */
     table mpls_tbl {
         key = {
             hdr.mpls[0].label: exact;
@@ -239,6 +253,7 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
+        // handle non-MPLS packets
         if (hdr.ipv4.isValid() && !hdr.mpls[0].isValid()) {
 
             // read ports into metadata
@@ -254,6 +269,8 @@ control MyIngress(inout headers hdr,
                 }
             }
         }
+
+        // handle MPLS packets (note that they may have just become MPLS packets by applying the tables above)
         if (hdr.mpls[0].isValid()) {
             mpls_tbl.apply();
         }

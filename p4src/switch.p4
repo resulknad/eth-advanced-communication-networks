@@ -44,7 +44,10 @@ control MyIngress(inout headers hdr,
         mark_to_drop(standard_metadata);
     }
 
-    action read_flowlet_registers(){
+    /*
+     * Reads the flowlet registers for a tcp flowlet and sets the corresponding metadata fields.
+     */
+    action read_flowlet_registers_tcp() {
 
         //compute register index
         hash(meta.flowlet_register_index,
@@ -53,8 +56,8 @@ control MyIngress(inout headers hdr,
             {
                 hdr.ipv4.srcAddr,
                 hdr.ipv4.dstAddr,
-                meta.srcPort,
-                meta.dstPort,
+                hdr.tcp.srcPort,
+                hdr.tcp.dstPort,
                 hdr.ipv4.protocol
             },
             (bit<14>)8192
@@ -70,10 +73,20 @@ control MyIngress(inout headers hdr,
         flowlet_time_stamp.write((bit<32>)meta.flowlet_register_index, standard_metadata.ingress_global_timestamp);
     }
 
-    action update_flowlet_id(){
+    /*
+     * Generates a random flowlet id.
+     */
+    action get_random_flowlet_id() {
         bit<32> random_t;
         random(random_t, (bit<32>)0, (bit<32>)65000);
         meta.flowlet_id = (bit<16>)random_t;
+    }
+
+    /*
+     * Generates a random flowlet id and writes it the corresponding register.
+     */
+    action update_flowlet_id(){
+        get_random_flowlet_id();
         flowlet_to_id.write((bit<32>)meta.flowlet_register_index, (bit<16>)meta.flowlet_id);
     }
 
@@ -305,22 +318,27 @@ control MyIngress(inout headers hdr,
             // read ports into metadata
             if (hdr.tcp.isValid()) {
                 get_tcp_ports();
+
+                @atomic {
+                    read_flowlet_registers_tcp();
+                    meta.flowlet_time_diff = standard_metadata.ingress_global_timestamp - meta.flowlet_last_stamp;
+
+                    // check if a new flowlet starts
+                    if (meta.flowlet_time_diff > FLOWLET_TIMEOUT){
+                        update_flowlet_id();
+                    }
+                }
+
             } else if (hdr.udp.isValid()) {
                 get_udp_ports();
+
+                // every UDP packet is its own "flowlet", so we generate a new id
+                get_random_flowlet_id();
+
             } else {
                 // avoid undefined behavior (e.g., for ICMP packets)
                 meta.srcPort = 0;
                 meta.dstPort = 0;
-            }
-
-            @atomic {
-                read_flowlet_registers();
-                meta.flowlet_time_diff = standard_metadata.ingress_global_timestamp - meta.flowlet_last_stamp;
-
-                // check if a new flowlet starts
-                if (meta.flowlet_time_diff > FLOWLET_TIMEOUT){
-                    update_flowlet_id();
-                }
             }
 
             switch (ipv4_lpm.apply().action_run) {

@@ -261,6 +261,10 @@ control MyIngress(inout headers hdr,
                 get_tcp_ports();
             } else if (hdr.udp.isValid()) {
                 get_udp_ports();
+            } else {
+                // avoid undefined behavior (e.g., for ICMP packets)
+                meta.srcPort = 0;
+                meta.dstPort = 0;
             }
 
             switch (ipv4_lpm.apply().action_run) {

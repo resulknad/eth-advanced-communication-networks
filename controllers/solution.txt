@@ -1,0 +1,1407 @@
+Have 0 flows from 0 to 1
+[]
+Status: Optimal
+__dummy = None
+Total Cost of Transportation =  None
+Have 5 flows from 1 to 2
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+LON_h0|BAR_h0 2
+POR_h0|PAR_h0 3
+MAD_h0|AMS_h0 4
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS|AMS_h0_4 = 2.5
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_2 = 10.0
+Route_BAR|MAD_1 = 2.5
+Route_LIS|LON_3 = 2.5
+Route_LON_h0|LON_2 = 10.0
+Route_LON|AMS_4 = 2.5
+Route_LON|MAD_2 = 7.5
+Route_LON|PAR_2 = 2.5
+Route_LON|PAR_3 = 2.5
+Route_MAD_h0|MAD_4 = 2.5
+Route_MAD|BAR_2 = 7.5
+Route_MAD|LON_4 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|BAR_1 = 2.5
+Route_PAR|BAR_2 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR|LIS_3 = 2.5
+Total Cost of Transportation =  80.0
+Have 6 flows from 2 to 3
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('MAD_h0', 'EIN_h0', 2.5)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+LON_h0|BAR_h0 2
+POR_h0|PAR_h0 3
+MAD_h0|AMS_h0 4
+MAD_h0|EIN_h0 5
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS|AMS_h0_4 = 2.5
+Route_AMS|EIN_5 = 2.5
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_2 = 10.0
+Route_EIN|EIN_h0_5 = 2.5
+Route_FRA|AMS_4 = 2.5
+Route_FRA|AMS_5 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_FRA|PAR_3 = 2.5
+Route_LON_h0|LON_2 = 10.0
+Route_LON|MAD_2 = 10.0
+Route_MAD_h0|MAD_4 = 2.5
+Route_MAD_h0|MAD_5 = 2.5
+Route_MAD|BAR_2 = 10.0
+Route_MAD|FRA_3 = 2.5
+Route_MAD|FRA_4 = 2.5
+Route_MAD|FRA_5 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|FRA_1 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR|MAD_3 = 2.5
+Total Cost of Transportation =  92.5
+Have 7 flows from 3 to 4
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('LIS_h0', 'MAD_h0', 10.0), ('MAD_h0', 'EIN_h0', 2.5)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+LON_h0|BAR_h0 2
+POR_h0|PAR_h0 3
+MAD_h0|AMS_h0 4
+LIS_h0|MAD_h0 5
+MAD_h0|EIN_h0 6
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS|AMS_h0_4 = 2.5
+Route_AMS|EIN_6 = 2.5
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_2 = 10.0
+Route_BAR|MAD_1 = 2.5
+Route_EIN|EIN_h0_6 = 2.5
+Route_FRA|AMS_4 = 2.5
+Route_FRA|AMS_6 = 2.5
+Route_FRA|PAR_3 = 2.5
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|LON_5 = 2.5
+Route_LIS|POR_5 = 7.5
+Route_LON_h0|LON_2 = 10.0
+Route_LON|MAD_2 = 7.5
+Route_LON|MAD_5 = 2.5
+Route_LON|PAR_2 = 2.5
+Route_MAD_h0|MAD_4 = 2.5
+Route_MAD_h0|MAD_6 = 2.5
+Route_MAD|BAR_2 = 7.5
+Route_MAD|FRA_3 = 2.5
+Route_MAD|FRA_4 = 2.5
+Route_MAD|FRA_6 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_5 = 10.0
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|BAR_1 = 2.5
+Route_PAR|BAR_2 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR|MAD_3 = 2.5
+Route_POR|MAD_5 = 7.5
+Total Cost of Transportation =  132.5
+Have 8 flows from 4 to 5.0
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('LIS_h0', 'MAD_h0', 10.0), ('BER_h0', 'LIS_h0', 1.0), ('MAD_h0', 'EIN_h0', 2.5)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+LON_h0|BAR_h0 2
+POR_h0|PAR_h0 3
+MAD_h0|AMS_h0 4
+LIS_h0|MAD_h0 5
+BER_h0|LIS_h0 6
+MAD_h0|EIN_h0 7
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS|AMS_h0_4 = 2.5
+Route_AMS|EIN_7 = 2.5
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_2 = 10.0
+Route_BER_h0|BER_6 = 1.0
+Route_BER|LIS_6 = 1.0
+Route_EIN|EIN_h0_7 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_FRA|PAR_3 = 2.5
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|LIS_h0_6 = 1.0
+Route_LIS|LON_5 = 2.5
+Route_LIS|POR_5 = 7.5
+Route_LON_h0|LON_2 = 10.0
+Route_LON|AMS_4 = 2.5
+Route_LON|AMS_7 = 2.5
+Route_LON|MAD_5 = 2.5
+Route_LON|PAR_2 = 10.0
+Route_MAD_h0|MAD_4 = 2.5
+Route_MAD_h0|MAD_7 = 2.5
+Route_MAD|FRA_3 = 2.5
+Route_MAD|LON_4 = 2.5
+Route_MAD|LON_7 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_5 = 10.0
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|BAR_2 = 10.0
+Route_PAR|FRA_1 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR|MAD_3 = 2.5
+Route_POR|MAD_5 = 7.5
+Total Cost of Transportation =  135.5
+Have 7 flows from 5.0 to 6.0
+[('LON_h0', 'BAR_h0', 10.0), ('AMS_h0', 'MAD_h0', 2.5), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'LON_h0', 2.5), ('LIS_h0', 'MAD_h0', 10.0), ('BER_h0', 'LIS_h0', 1.0), ('MAD_h0', 'EIN_h0', 2.5)]
+LON_h0|BAR_h0 0
+AMS_h0|MAD_h0 1
+POR_h0|LON_h0 2
+LIS_h0|LON_h0 3
+LIS_h0|MAD_h0 4
+BER_h0|LIS_h0 5
+MAD_h0|EIN_h0 6
+Status: Optimal
+Route_AMS_h0|AMS_1 = 2.5
+Route_AMS|EIN_6 = 2.5
+Route_AMS|FRA_1 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BER_h0|BER_5 = 1.0
+Route_BER|FRA_4 = 2.5
+Route_BER|LIS_5 = 1.0
+Route_EIN|EIN_h0_6 = 2.5
+Route_FRA|AMS_6 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_FRA|MAD_4 = 2.5
+Route_LIS_h0|LIS_3 = 2.5
+Route_LIS_h0|LIS_4 = 10.0
+Route_LIS|BER_4 = 2.5
+Route_LIS|LIS_h0_5 = 1.0
+Route_LIS|LON_2 = 5.0
+Route_LIS|LON_3 = 2.5
+Route_LIS|LON_4 = 2.5
+Route_LIS|POR_4 = 5.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_2 = 10.0
+Route_LON|LON_h0_3 = 2.5
+Route_LON|MAD_0 = 2.5
+Route_LON|MAD_4 = 2.5
+Route_LON|PAR_0 = 7.5
+Route_MAD_h0|MAD_6 = 2.5
+Route_MAD|BAR_0 = 2.5
+Route_MAD|FRA_6 = 2.5
+Route_MAD|LON_2 = 5.0
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_4 = 10.0
+Route_PAR|BAR_0 = 7.5
+Route_POR_h0|POR_2 = 10.0
+Route_POR|LIS_2 = 5.0
+Route_POR|MAD_2 = 5.0
+Route_POR|MAD_4 = 5.0
+Total Cost of Transportation =  155.5
+Have 6 flows from 6.0 to 9.0
+[('LON_h0', 'BAR_h0', 10.0), ('AMS_h0', 'MAD_h0', 2.5), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'LON_h0', 2.5), ('LIS_h0', 'MAD_h0', 10.0), ('BER_h0', 'LIS_h0', 1.0)]
+LON_h0|BAR_h0 0
+AMS_h0|MAD_h0 1
+POR_h0|LON_h0 2
+LIS_h0|LON_h0 3
+LIS_h0|MAD_h0 4
+BER_h0|LIS_h0 5
+Status: Optimal
+Route_AMS_h0|AMS_1 = 2.5
+Route_AMS|FRA_1 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BER_h0|BER_5 = 1.0
+Route_BER|FRA_4 = 2.5
+Route_BER|LIS_5 = 1.0
+Route_FRA|MAD_1 = 2.5
+Route_FRA|MAD_4 = 2.5
+Route_LIS_h0|LIS_3 = 2.5
+Route_LIS_h0|LIS_4 = 10.0
+Route_LIS|BER_4 = 2.5
+Route_LIS|LIS_h0_5 = 1.0
+Route_LIS|LON_2 = 5.0
+Route_LIS|LON_3 = 2.5
+Route_LIS|LON_4 = 2.5
+Route_LIS|POR_4 = 5.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_2 = 10.0
+Route_LON|LON_h0_3 = 2.5
+Route_LON|MAD_0 = 2.5
+Route_LON|MAD_4 = 2.5
+Route_LON|PAR_0 = 7.5
+Route_MAD|BAR_0 = 2.5
+Route_MAD|LON_2 = 5.0
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_4 = 10.0
+Route_PAR|BAR_0 = 7.5
+Route_POR_h0|POR_2 = 10.0
+Route_POR|LIS_2 = 5.0
+Route_POR|MAD_2 = 5.0
+Route_POR|MAD_4 = 5.0
+Total Cost of Transportation =  143.0
+Have 5 flows from 9.0 to 11.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'AMS_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIS_h0', 'MAD_h0', 10.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+EIN_h0|AMS_h0 2
+PAR_h0|REN_h0 3
+LIS_h0|MAD_h0 4
+Status: Optimal
+Route_AMS|AMS_h0_2 = 10.0
+Route_BAR|BAR_h0_0 = 10.0
+Route_EIN_h0|EIN_2 = 10.0
+Route_EIN|AMS_2 = 10.0
+Route_LIS_h0|LIS_4 = 10.0
+Route_LIS|LON_1 = 5.0
+Route_LIS|LON_4 = 5.0
+Route_LIS|POR_4 = 5.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|MAD_4 = 5.0
+Route_LON|PAR_0 = 10.0
+Route_MAD|LON_1 = 5.0
+Route_MAD|MAD_h0_4 = 10.0
+Route_PAR_h0|PAR_3 = 10.0
+Route_PAR|BAR_0 = 10.0
+Route_PAR|REN_3 = 10.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 5.0
+Route_POR|MAD_1 = 5.0
+Route_POR|MAD_4 = 5.0
+Route_REN|REN_h0_3 = 10.0
+Total Cost of Transportation =  180.0
+Have 5 flows from 11.0 to 12
+[('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'AMS_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('LIS_h0', 'MAD_h0', 10.0)]
+POR_h0|LON_h0 0
+EIN_h0|AMS_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+LIS_h0|MAD_h0 4
+Status: Optimal
+Route_AMS|AMS_h0_1 = 10.0
+Route_EIN_h0|EIN_1 = 10.0
+Route_EIN|AMS_1 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_4 = 10.0
+Route_LIS|LON_0 = 5.0
+Route_LIS|LON_4 = 5.0
+Route_LIS|POR_4 = 5.0
+Route_LON|LON_h0_0 = 10.0
+Route_LON|MAD_4 = 5.0
+Route_MAD|LON_0 = 5.0
+Route_MAD|MAD_h0_4 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR_h0|POR_0 = 10.0
+Route_POR|LIS_0 = 5.0
+Route_POR|MAD_0 = 5.0
+Route_POR|MAD_4 = 5.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  42949673100.0
+Have 6 flows from 12 to 13.0
+[('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'AMS_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('BAR_h0', 'MAD_h0', 2.5), ('LIS_h0', 'MAD_h0', 10.0)]
+POR_h0|LON_h0 0
+EIN_h0|AMS_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+BAR_h0|MAD_h0 4
+LIS_h0|MAD_h0 5
+Status: Optimal
+Route_AMS|AMS_h0_1 = 10.0
+Route_BAR_h0|BAR_4 = 2.5
+Route_BAR|MAD_4 = 2.5
+Route_EIN_h0|EIN_1 = 10.0
+Route_EIN|AMS_1 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|LON_0 = 5.0
+Route_LIS|LON_5 = 5.0
+Route_LIS|POR_5 = 5.0
+Route_LON|LON_h0_0 = 10.0
+Route_LON|MAD_5 = 5.0
+Route_MAD|LON_0 = 5.0
+Route_MAD|MAD_h0_4 = 2.5
+Route_MAD|MAD_h0_5 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR_h0|POR_0 = 10.0
+Route_POR|LIS_0 = 5.0
+Route_POR|MAD_0 = 5.0
+Route_POR|MAD_5 = 5.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  42949673107.5
+Have 6 flows from 13.0 to 14
+[('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('BAR_h0', 'MAD_h0', 2.5)]
+POR_h0|LON_h0 0
+EIN_h0|AMS_h0 1
+MAN_h0|BRI_h0 2
+PAR_h0|REN_h0 3
+LIL_h0|REN_h0 4
+BAR_h0|MAD_h0 5
+Status: Optimal
+Route_AMS|AMS_h0_1 = 10.0
+Route_BAR_h0|BAR_5 = 2.5
+Route_BAR|MAD_5 = 2.5
+Route_BRI|BRI_h0_2 = 10.0
+Route_EIN_h0|EIN_1 = 10.0
+Route_EIN|AMS_1 = 10.0
+Route_LIL_h0|REN_h0_4 = 10.0
+Route_LIS|LON_0 = 10.0
+Route_LON|BRI_2 = 10.0
+Route_LON|LON_h0_0 = 10.0
+Route_MAD|MAD_h0_5 = 2.5
+Route_MAN_h0|MAN_2 = 10.0
+Route_MAN|LON_2 = 10.0
+Route_PAR_h0|PAR_3 = 10.0
+Route_PAR|REN_3 = 10.0
+Route_POR_h0|POR_0 = 10.0
+Route_POR|LIS_0 = 10.0
+Route_REN|REN_h0_3 = 10.0
+Total Cost of Transportation =  42949673107.5
+Have 7 flows from 14 to 15.0
+[('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('BAR_h0', 'MAD_h0', 2.5), ('LIS_h0', 'POR_h0', 10.0)]
+POR_h0|LON_h0 0
+EIN_h0|AMS_h0 1
+MAN_h0|BRI_h0 2
+PAR_h0|REN_h0 3
+LIL_h0|REN_h0 4
+BAR_h0|MAD_h0 5
+LIS_h0|POR_h0 6
+Status: Optimal
+Route_AMS|AMS_h0_1 = 10.0
+Route_BAR_h0|BAR_5 = 2.5
+Route_BAR|MAD_5 = 2.5
+Route_BRI|BRI_h0_2 = 10.0
+Route_EIN_h0|EIN_1 = 10.0
+Route_EIN|AMS_1 = 10.0
+Route_LIL_h0|REN_h0_4 = 10.0
+Route_LIS_h0|LIS_6 = 10.0
+Route_LIS|POR_6 = 10.0
+Route_LON|BRI_2 = 10.0
+Route_LON|LON_h0_0 = 10.0
+Route_MAD|LON_0 = 10.0
+Route_MAD|MAD_h0_5 = 2.5
+Route_MAN_h0|MAN_2 = 10.0
+Route_MAN|LON_2 = 10.0
+Route_PAR_h0|PAR_3 = 10.0
+Route_PAR|REN_3 = 10.0
+Route_POR_h0|POR_0 = 10.0
+Route_POR|MAD_0 = 10.0
+Route_POR|POR_h0_6 = 10.0
+Route_REN|REN_h0_3 = 10.0
+Total Cost of Transportation =  42949673137.5
+Have 6 flows from 15.0 to 16.0
+[('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('BAR_h0', 'MAD_h0', 2.5), ('LIS_h0', 'POR_h0', 10.0)]
+EIN_h0|AMS_h0 0
+MAN_h0|BRI_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+BAR_h0|MAD_h0 4
+LIS_h0|POR_h0 5
+Status: Optimal
+Route_AMS|AMS_h0_0 = 10.0
+Route_BAR_h0|BAR_4 = 2.5
+Route_BAR|MAD_4 = 2.5
+Route_BRI|BRI_h0_1 = 10.0
+Route_EIN_h0|EIN_0 = 10.0
+Route_EIN|AMS_0 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|POR_5 = 10.0
+Route_LON|BRI_1 = 10.0
+Route_MAD|MAD_h0_4 = 2.5
+Route_MAN_h0|MAN_1 = 10.0
+Route_MAN|LON_1 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR|POR_h0_5 = 10.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  42949673097.5
+Have 5 flows from 16.0 to 17
+[('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0)]
+EIN_h0|AMS_h0 0
+MAN_h0|BRI_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+LIS_h0|POR_h0 4
+Status: Optimal
+Route_AMS|AMS_h0_0 = 10.0
+Route_BRI|BRI_h0_1 = 10.0
+Route_EIN_h0|EIN_0 = 10.0
+Route_EIN|AMS_0 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_4 = 10.0
+Route_LIS|POR_4 = 10.0
+Route_LON|BRI_1 = 10.0
+Route_MAN_h0|MAN_1 = 10.0
+Route_MAN|LON_1 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR|POR_h0_4 = 10.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  42949673090.0
+Have 6 flows from 17 to 18
+[('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0)]
+EIN_h0|AMS_h0 0
+MAN_h0|BRI_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+EIN_h0|BRI_h0 4
+LIS_h0|POR_h0 5
+Status: Optimal
+Route_AMS|AMS_h0_0 = 10.0
+Route_BRI|BRI_h0_1 = 10.0
+Route_EIN_h0|BRI_h0_4 = 10.0
+Route_EIN_h0|EIN_0 = 10.0
+Route_EIN|AMS_0 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|POR_5 = 10.0
+Route_LON|BRI_1 = 10.0
+Route_MAN_h0|MAN_1 = 10.0
+Route_MAN|LON_1 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR|POR_h0_5 = 10.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  85899346050.0
+Have 7 flows from 18 to 19.0
+[('EIN_h0', 'AMS_h0', 10.0), ('MAN_h0', 'BRI_h0', 10.0), ('PAR_h0', 'REN_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('MAD_h0', 'POR_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0)]
+EIN_h0|AMS_h0 0
+MAN_h0|BRI_h0 1
+PAR_h0|REN_h0 2
+LIL_h0|REN_h0 3
+EIN_h0|BRI_h0 4
+MAD_h0|POR_h0 5
+LIS_h0|POR_h0 6
+Status: Optimal
+Route_AMS|AMS_h0_0 = 10.0
+Route_BRI|BRI_h0_1 = 10.0
+Route_EIN_h0|BRI_h0_4 = 10.0
+Route_EIN_h0|EIN_0 = 10.0
+Route_EIN|AMS_0 = 10.0
+Route_LIL_h0|REN_h0_3 = 10.0
+Route_LIS_h0|LIS_6 = 10.0
+Route_LIS|POR_6 = 10.0
+Route_LON|BRI_1 = 10.0
+Route_MAD_h0|MAD_5 = 10.0
+Route_MAD|POR_5 = 10.0
+Route_MAN_h0|MAN_1 = 10.0
+Route_MAN|LON_1 = 10.0
+Route_PAR_h0|PAR_2 = 10.0
+Route_PAR|REN_2 = 10.0
+Route_POR|POR_h0_5 = 10.0
+Route_POR|POR_h0_6 = 10.0
+Route_REN|REN_h0_2 = 10.0
+Total Cost of Transportation =  85899346080.0
+Have 6 flows from 19.0 to 20
+[('MAN_h0', 'BRI_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('POR_h0', 'MAD_h0', 2.5), ('MAD_h0', 'POR_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0)]
+MAN_h0|BRI_h0 0
+LIL_h0|REN_h0 1
+EIN_h0|BRI_h0 2
+POR_h0|MAD_h0 3
+MAD_h0|POR_h0 4
+LIS_h0|POR_h0 5
+Status: Optimal
+Route_AMS|LON_2 = 10.0
+Route_BRI|BRI_h0_0 = 10.0
+Route_BRI|BRI_h0_2 = 10.0
+Route_EIN_h0|EIN_2 = 10.0
+Route_EIN|AMS_2 = 10.0
+Route_GLO|BRI_0 = 10.0
+Route_LIL_h0|LIL_1 = 10.0
+Route_LIL|PAR_1 = 10.0
+Route_LIS_h0|LIS_5 = 10.0
+Route_LIS|POR_5 = 10.0
+Route_LON|BRI_2 = 10.0
+Route_LON|GLO_0 = 10.0
+Route_MAD_h0|MAD_4 = 7.5
+Route_MAD_h0|POR_h0_4 = 2.5
+Route_MAD|MAD_h0_3 = 2.5
+Route_MAD|POR_4 = 7.5
+Route_MAN_h0|MAN_0 = 10.0
+Route_MAN|LON_0 = 10.0
+Route_PAR|REN_1 = 10.0
+Route_POR_h0|POR_3 = 2.5
+Route_POR|MAD_3 = 2.5
+Route_POR|POR_h0_4 = 7.5
+Route_POR|POR_h0_5 = 10.0
+Route_REN|REN_h0_1 = 10.0
+Total Cost of Transportation =  10737418440.0
+Have 11 flows from 20 to 21.0
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('POR_h0', 'LON_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAN_h0', 'BRI_h0', 10.0), ('LIL_h0', 'REN_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('POR_h0', 'MAD_h0', 2.5), ('MAD_h0', 'POR_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+AMS_h0|MAD_h0 2
+POR_h0|LON_h0 3
+POR_h0|PAR_h0 4
+MAN_h0|BRI_h0 5
+LIL_h0|REN_h0 6
+EIN_h0|BRI_h0 7
+POR_h0|MAD_h0 8
+MAD_h0|POR_h0 9
+LIS_h0|POR_h0 10
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS_h0|AMS_2 = 2.5
+Route_AMS|FRA_2 = 2.5
+Route_AMS|LON_7 = 10.0
+Route_AMS|PAR_0 = 2.5
+Route_BAR|MAD_1 = 2.5
+Route_BRI|BRI_h0_5 = 10.0
+Route_BRI|BRI_h0_7 = 10.0
+Route_EIN_h0|EIN_7 = 10.0
+Route_EIN|AMS_7 = 10.0
+Route_FRA|MAD_2 = 2.5
+Route_GLO|BRI_7 = 10.0
+Route_LIL_h0|LIL_6 = 10.0
+Route_LIL|PAR_6 = 10.0
+Route_LIS_h0|LIS_10 = 10.0
+Route_LIS|POR_10 = 10.0
+Route_LON|BRI_5 = 10.0
+Route_LON|GLO_7 = 10.0
+Route_MAD_h0|MAD_9 = 10.0
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_2 = 2.5
+Route_MAD|POR_9 = 10.0
+Route_MAN_h0|MAN_5 = 10.0
+Route_MAN|LON_5 = 10.0
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|BAR_1 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_PAR|REN_6 = 10.0
+Route_POR_h0|LON_h0_3 = 10.0
+Route_POR_h0|MAD_h0_8 = 2.5
+Route_POR_h0|PAR_h0_4 = 2.5
+Route_POR|POR_h0_10 = 10.0
+Route_POR|POR_h0_9 = 10.0
+Route_REN|REN_h0_6 = 10.0
+Total Cost of Transportation =  64424509667.5
+Have 11 flows from 21.0 to 23.0
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('POR_h0', 'LON_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('MAN_h0', 'BRI_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('POR_h0', 'MAD_h0', 2.5), ('MAD_h0', 'POR_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0), ('BRI_h0', 'BAR_h0', 1.0)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+AMS_h0|MAD_h0 2
+POR_h0|LON_h0 3
+POR_h0|PAR_h0 4
+MAN_h0|BRI_h0 5
+EIN_h0|BRI_h0 6
+POR_h0|MAD_h0 7
+MAD_h0|POR_h0 8
+LIS_h0|POR_h0 9
+BRI_h0|BAR_h0 10
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS_h0|AMS_2 = 2.5
+Route_AMS|FRA_2 = 2.5
+Route_AMS|LON_6 = 10.0
+Route_AMS|PAR_0 = 2.5
+Route_BAR|MAD_1 = 2.5
+Route_BRI_h0|BAR_h0_10 = 1.0
+Route_BRI|BRI_h0_5 = 10.0
+Route_BRI|BRI_h0_6 = 10.0
+Route_EIN_h0|EIN_6 = 10.0
+Route_EIN|AMS_6 = 10.0
+Route_FRA|MAD_2 = 2.5
+Route_GLO|BRI_6 = 10.0
+Route_LIS_h0|LIS_9 = 10.0
+Route_LIS|POR_9 = 10.0
+Route_LON|BRI_5 = 10.0
+Route_LON|GLO_6 = 10.0
+Route_MAD_h0|MAD_8 = 10.0
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_2 = 2.5
+Route_MAD|POR_8 = 10.0
+Route_MAN_h0|MAN_5 = 10.0
+Route_MAN|LON_5 = 10.0
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|BAR_1 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_POR_h0|LON_h0_3 = 10.0
+Route_POR_h0|MAD_h0_7 = 2.5
+Route_POR_h0|PAR_h0_4 = 2.5
+Route_POR|POR_h0_8 = 10.0
+Route_POR|POR_h0_9 = 10.0
+Total Cost of Transportation =  68719476923.5
+Have 9 flows from 23.0 to 24.0
+[('AMS_h0', 'PAR_h0', 2.5), ('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('POR_h0', 'LON_h0', 10.0), ('POR_h0', 'PAR_h0', 2.5), ('EIN_h0', 'BRI_h0', 10.0), ('MAD_h0', 'POR_h0', 10.0), ('LIS_h0', 'POR_h0', 10.0), ('BRI_h0', 'BAR_h0', 1.0)]
+AMS_h0|PAR_h0 0
+PAR_h0|MAD_h0 1
+AMS_h0|MAD_h0 2
+POR_h0|LON_h0 3
+POR_h0|PAR_h0 4
+EIN_h0|BRI_h0 5
+MAD_h0|POR_h0 6
+LIS_h0|POR_h0 7
+BRI_h0|BAR_h0 8
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS_h0|AMS_2 = 2.5
+Route_AMS|FRA_2 = 2.5
+Route_AMS|LON_5 = 10.0
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_8 = 1.0
+Route_BRI_h0|BRI_8 = 1.0
+Route_BRI|BRI_h0_5 = 10.0
+Route_BRI|LON_8 = 1.0
+Route_EIN_h0|EIN_5 = 10.0
+Route_EIN|AMS_5 = 10.0
+Route_FRA|MAD_2 = 2.5
+Route_GLO|BRI_5 = 1.0
+Route_LIS_h0|LIS_7 = 10.0
+Route_LIS|POR_7 = 10.0
+Route_LON|BRI_5 = 9.0
+Route_LON|GLO_5 = 1.0
+Route_LON|MAD_1 = 2.5
+Route_LON|MAD_8 = 1.0
+Route_MAD_h0|MAD_6 = 10.0
+Route_MAD|BAR_8 = 1.0
+Route_MAD|MAD_h0_1 = 2.5
+Route_MAD|MAD_h0_2 = 2.5
+Route_MAD|POR_6 = 10.0
+Route_PAR_h0|PAR_1 = 2.5
+Route_PAR|LON_1 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_POR_h0|LON_h0_3 = 10.0
+Route_POR_h0|PAR_h0_4 = 2.5
+Route_POR|POR_h0_6 = 10.0
+Route_POR|POR_h0_7 = 10.0
+Total Cost of Transportation =  53687091343.5
+Have 4 flows from 24.0 to 25
+[('POR_h0', 'LON_h0', 10.0), ('EIN_h0', 'BRI_h0', 10.0), ('MAD_h0', 'POR_h0', 10.0), ('BRI_h0', 'BAR_h0', 1.0)]
+POR_h0|LON_h0 0
+EIN_h0|BRI_h0 1
+MAD_h0|POR_h0 2
+BRI_h0|BAR_h0 3
+Status: Optimal
+Route_AMS|LON_1 = 10.0
+Route_BAR|BAR_h0_3 = 1.0
+Route_BRI_h0|BRI_3 = 1.0
+Route_BRI|BRI_h0_1 = 10.0
+Route_BRI|GLO_3 = 1.0
+Route_EIN_h0|EIN_1 = 10.0
+Route_EIN|AMS_1 = 10.0
+Route_GLO|LON_3 = 1.0
+Route_LIS|LON_0 = 10.0
+Route_LON|BRI_1 = 10.0
+Route_LON|LON_h0_0 = 10.0
+Route_LON|MAD_3 = 1.0
+Route_MAD_h0|MAD_2 = 10.0
+Route_MAD|BAR_3 = 1.0
+Route_MAD|POR_2 = 10.0
+Route_POR_h0|POR_0 = 10.0
+Route_POR|LIS_0 = 10.0
+Route_POR|POR_h0_2 = 10.0
+Total Cost of Transportation =  126.0
+Have 8 flows from 25 to 27.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'LON_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('EIN_h0', 'BRI_h0', 10.0), ('MAD_h0', 'POR_h0', 10.0), ('MUN_h0', 'MAD_h0', 2.5), ('BRI_h0', 'BAR_h0', 1.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+LIS_h0|LON_h0 2
+MAD_h0|AMS_h0 3
+EIN_h0|BRI_h0 4
+MAD_h0|POR_h0 5
+MUN_h0|MAD_h0 6
+BRI_h0|BAR_h0 7
+Status: Optimal
+Route_AMS|AMS_h0_3 = 2.5
+Route_AMS|LON_4 = 10.0
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_7 = 1.0
+Route_BER|FRA_2 = 2.5
+Route_BRI_h0|BRI_7 = 1.0
+Route_BRI|BRI_h0_4 = 10.0
+Route_BRI|GLO_7 = 1.0
+Route_EIN_h0|EIN_4 = 10.0
+Route_EIN|AMS_4 = 10.0
+Route_FRA|AMS_3 = 2.5
+Route_FRA|LON_2 = 2.5
+Route_FRA|MAD_6 = 2.5
+Route_GLO|LON_7 = 1.0
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS|BER_2 = 2.5
+Route_LIS|LON_1 = 10.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|BRI_4 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|LON_h0_2 = 2.5
+Route_LON|MAD_7 = 1.0
+Route_LON|PAR_0 = 10.0
+Route_MAD_h0|MAD_3 = 2.5
+Route_MAD_h0|MAD_5 = 10.0
+Route_MAD|BAR_7 = 1.0
+Route_MAD|FRA_3 = 2.5
+Route_MAD|MAD_h0_6 = 2.5
+Route_MAD|POR_5 = 10.0
+Route_MUN_h0|MUN_6 = 2.5
+Route_MUN|FRA_6 = 2.5
+Route_PAR|BAR_0 = 10.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 10.0
+Route_POR|POR_h0_5 = 10.0
+Total Cost of Transportation =  198.5
+Have 8 flows from 27.0 to 28.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'LON_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('GLO_h0', 'LON_h0', 2.5), ('MAD_h0', 'POR_h0', 10.0), ('MUN_h0', 'MAD_h0', 2.5), ('BRI_h0', 'BAR_h0', 1.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+LIS_h0|LON_h0 2
+MAD_h0|AMS_h0 3
+GLO_h0|LON_h0 4
+MAD_h0|POR_h0 5
+MUN_h0|MAD_h0 6
+BRI_h0|BAR_h0 7
+Status: Optimal
+Route_AMS|AMS_h0_3 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_7 = 1.0
+Route_BER|FRA_2 = 2.5
+Route_BRI_h0|BRI_7 = 1.0
+Route_BRI|LON_7 = 1.0
+Route_FRA|AMS_3 = 2.5
+Route_FRA|LON_2 = 2.5
+Route_FRA|MAD_6 = 2.5
+Route_GLO_h0|GLO_4 = 2.5
+Route_GLO|LON_4 = 2.5
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS|BER_2 = 2.5
+Route_LIS|LON_1 = 10.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|LON_h0_2 = 2.5
+Route_LON|LON_h0_4 = 2.5
+Route_LON|MAD_7 = 1.0
+Route_LON|PAR_0 = 10.0
+Route_MAD_h0|MAD_3 = 2.5
+Route_MAD_h0|MAD_5 = 10.0
+Route_MAD|BAR_7 = 1.0
+Route_MAD|FRA_3 = 2.5
+Route_MAD|MAD_h0_6 = 2.5
+Route_MAD|POR_5 = 10.0
+Route_MUN_h0|MUN_6 = 2.5
+Route_MUN|FRA_6 = 2.5
+Route_PAR|BAR_0 = 10.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 10.0
+Route_POR|POR_h0_5 = 10.0
+Total Cost of Transportation =  155.0
+Have 7 flows from 28.0 to 29.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'LON_h0', 2.5), ('MAD_h0', 'AMS_h0', 2.5), ('GLO_h0', 'LON_h0', 2.5), ('MUN_h0', 'MAD_h0', 2.5), ('BRI_h0', 'BAR_h0', 1.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+LIS_h0|LON_h0 2
+MAD_h0|AMS_h0 3
+GLO_h0|LON_h0 4
+MUN_h0|MAD_h0 5
+BRI_h0|BAR_h0 6
+Status: Optimal
+Route_AMS|AMS_h0_3 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_6 = 1.0
+Route_BRI_h0|BRI_6 = 1.0
+Route_BRI|LON_6 = 1.0
+Route_FRA|AMS_3 = 2.5
+Route_FRA|MAD_5 = 2.5
+Route_GLO_h0|GLO_4 = 2.5
+Route_GLO|LON_4 = 2.5
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS|LON_1 = 7.5
+Route_LIS|LON_2 = 2.5
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|LON_h0_2 = 2.5
+Route_LON|LON_h0_4 = 2.5
+Route_LON|MAD_0 = 1.0
+Route_LON|PAR_0 = 9.0
+Route_LON|PAR_6 = 1.0
+Route_MAD_h0|MAD_3 = 2.5
+Route_MAD|BAR_0 = 1.0
+Route_MAD|FRA_3 = 2.5
+Route_MAD|LON_1 = 2.5
+Route_MAD|MAD_h0_5 = 2.5
+Route_MUN_h0|MUN_5 = 2.5
+Route_MUN|FRA_5 = 2.5
+Route_PAR|BAR_0 = 9.0
+Route_PAR|BAR_6 = 1.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 7.5
+Route_POR|MAD_1 = 2.5
+Total Cost of Transportation =  120.0
+Have 6 flows from 29.0 to 30.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('GLO_h0', 'LON_h0', 2.5), ('EIN_h0', 'REN_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('BRI_h0', 'BAR_h0', 1.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+GLO_h0|LON_h0 2
+EIN_h0|REN_h0 3
+MAD_h0|BAR_h0 4
+BRI_h0|BAR_h0 5
+Status: Optimal
+Route_AMS|PAR_3 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_4 = 10.0
+Route_BAR|BAR_h0_5 = 1.0
+Route_BRI_h0|BRI_5 = 1.0
+Route_BRI|LON_5 = 1.0
+Route_EIN_h0|EIN_3 = 2.5
+Route_EIN|AMS_3 = 2.5
+Route_FRA|MUN_0 = 1.0
+Route_GLO_h0|GLO_2 = 2.5
+Route_GLO|LON_2 = 2.5
+Route_LIS|LON_1 = 10.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|FRA_0 = 1.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|LON_h0_2 = 2.5
+Route_LON|PAR_0 = 9.0
+Route_LON|PAR_5 = 1.0
+Route_MAD_h0|MAD_4 = 10.0
+Route_MAD|BAR_4 = 10.0
+Route_MUN|BAR_0 = 1.0
+Route_PAR|BAR_0 = 9.0
+Route_PAR|BAR_5 = 1.0
+Route_PAR|REN_3 = 2.5
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 10.0
+Route_REN|REN_h0_3 = 2.5
+Total Cost of Transportation =  136.0
+Have 5 flows from 30.0 to 31.0
+[('LON_h0', 'BAR_h0', 10.0), ('GLO_h0', 'LON_h0', 2.5), ('EIN_h0', 'REN_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('BRI_h0', 'BAR_h0', 1.0)]
+LON_h0|BAR_h0 0
+GLO_h0|LON_h0 1
+EIN_h0|REN_h0 2
+MAD_h0|BAR_h0 3
+BRI_h0|BAR_h0 4
+Status: Optimal
+Route_AMS|PAR_2 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_3 = 10.0
+Route_BAR|BAR_h0_4 = 1.0
+Route_BRI_h0|BRI_4 = 1.0
+Route_BRI|LON_4 = 1.0
+Route_EIN_h0|EIN_2 = 2.5
+Route_EIN|AMS_2 = 2.5
+Route_FRA|MUN_4 = 1.0
+Route_GLO_h0|GLO_1 = 2.5
+Route_GLO|LON_1 = 2.5
+Route_LON_h0|LON_0 = 10.0
+Route_LON|FRA_4 = 1.0
+Route_LON|LON_h0_1 = 2.5
+Route_LON|PAR_0 = 10.0
+Route_MAD_h0|MAD_3 = 10.0
+Route_MAD|BAR_3 = 10.0
+Route_MUN|BAR_4 = 1.0
+Route_PAR|BAR_0 = 10.0
+Route_PAR|REN_2 = 2.5
+Route_REN|REN_h0_2 = 2.5
+Total Cost of Transportation =  96.0
+Have 5 flows from 31.0 to 33.0
+[('LON_h0', 'BAR_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('EIN_h0', 'REN_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('BAR_h0', 'POR_h0', 2.5)]
+LON_h0|BAR_h0 0
+BER_h0|FRA_h0 1
+EIN_h0|REN_h0 2
+MAD_h0|BAR_h0 3
+BAR_h0|POR_h0 4
+Status: Optimal
+Route_AMS|PAR_2 = 2.5
+Route_BAR_h0|BAR_4 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_3 = 10.0
+Route_BAR|MUN_4 = 2.5
+Route_BER_h0|BER_1 = 10.0
+Route_BER|FRA_1 = 10.0
+Route_EIN_h0|EIN_2 = 2.5
+Route_EIN|AMS_2 = 2.5
+Route_FRA|FRA_h0_1 = 10.0
+Route_FRA|MAD_4 = 2.5
+Route_LON_h0|LON_0 = 10.0
+Route_LON|PAR_0 = 10.0
+Route_MAD_h0|MAD_3 = 10.0
+Route_MAD|BAR_3 = 10.0
+Route_MAD|POR_4 = 2.5
+Route_MUN|FRA_4 = 2.5
+Route_PAR|BAR_0 = 10.0
+Route_PAR|REN_2 = 2.5
+Route_POR|POR_h0_4 = 2.5
+Route_REN|REN_h0_2 = 2.5
+Total Cost of Transportation =  127.5
+Have 6 flows from 33.0 to 34
+[('LON_h0', 'BAR_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('LON_h0', 'BRI_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('BAR_h0', 'POR_h0', 2.5), ('LIL_h0', 'GLO_h0', 2.5)]
+LON_h0|BAR_h0 0
+BER_h0|FRA_h0 1
+LON_h0|BRI_h0 2
+MAD_h0|BAR_h0 3
+BAR_h0|POR_h0 4
+LIL_h0|GLO_h0 5
+Status: Optimal
+Route_BAR_h0|BAR_4 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_3 = 10.0
+Route_BAR|MAD_4 = 2.5
+Route_BER_h0|BER_1 = 10.0
+Route_BER|FRA_1 = 10.0
+Route_BRI|BRI_h0_2 = 2.5
+Route_FRA|FRA_h0_1 = 10.0
+Route_FRA|MUN_0 = 2.5
+Route_FRA|PAR_3 = 2.5
+Route_GLO|GLO_h0_5 = 2.5
+Route_LIL_h0|LIL_5 = 2.5
+Route_LIL|PAR_5 = 2.5
+Route_LON_h0|LON_0 = 10.0
+Route_LON_h0|LON_2 = 2.5
+Route_LON|BRI_2 = 2.5
+Route_LON|FRA_0 = 2.5
+Route_LON|GLO_5 = 2.5
+Route_LON|PAR_0 = 7.5
+Route_MAD_h0|MAD_3 = 10.0
+Route_MAD|BAR_3 = 7.5
+Route_MAD|FRA_3 = 2.5
+Route_MAD|POR_4 = 2.5
+Route_MUN|BAR_0 = 2.5
+Route_PAR|BAR_0 = 7.5
+Route_PAR|BAR_3 = 2.5
+Route_PAR|LON_5 = 2.5
+Route_POR|POR_h0_4 = 2.5
+Total Cost of Transportation =  137.5
+Have 9 flows from 34 to 35.0
+[('LON_h0', 'BAR_h0', 10.0), ('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('MUN_h0', 'FRA_h0', 2.5), ('LON_h0', 'BRI_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('BAR_h0', 'POR_h0', 2.5), ('REN_h0', 'POR_h0', 2.5), ('LIL_h0', 'GLO_h0', 2.5)]
+LON_h0|BAR_h0 0
+BER_h0|MUN_h0 1
+BER_h0|FRA_h0 2
+MUN_h0|FRA_h0 3
+LON_h0|BRI_h0 4
+MAD_h0|BAR_h0 5
+BAR_h0|POR_h0 6
+REN_h0|POR_h0 7
+LIL_h0|GLO_h0 8
+Status: Optimal
+Route_BAR_h0|BAR_6 = 2.5
+Route_BAR|BAR_h0_0 = 10.0
+Route_BAR|BAR_h0_5 = 10.0
+Route_BAR|MAD_6 = 2.5
+Route_BER_h0|BER_1 = 10.0
+Route_BER_h0|BER_2 = 10.0
+Route_BER|FRA_2 = 10.0
+Route_BER|MUN_1 = 10.0
+Route_BRI|BRI_h0_4 = 2.5
+Route_FRA|FRA_h0_2 = 10.0
+Route_FRA|FRA_h0_3 = 2.5
+Route_FRA|LON_8 = 2.5
+Route_FRA|MAD_7 = 2.5
+Route_FRA|MUN_5 = 2.5
+Route_GLO|GLO_h0_8 = 2.5
+Route_LIL_h0|LIL_8 = 2.5
+Route_LIL|PAR_8 = 2.5
+Route_LON_h0|LON_0 = 10.0
+Route_LON_h0|LON_4 = 2.5
+Route_LON|BRI_4 = 2.5
+Route_LON|GLO_8 = 2.5
+Route_LON|PAR_0 = 10.0
+Route_MAD_h0|MAD_5 = 10.0
+Route_MAD|BAR_5 = 7.5
+Route_MAD|FRA_5 = 2.5
+Route_MAD|POR_6 = 2.5
+Route_MAD|POR_7 = 2.5
+Route_MUN_h0|MUN_3 = 2.5
+Route_MUN|BAR_5 = 2.5
+Route_MUN|FRA_3 = 2.5
+Route_MUN|MUN_h0_1 = 10.0
+Route_PAR|BAR_0 = 10.0
+Route_PAR|FRA_7 = 2.5
+Route_PAR|FRA_8 = 2.5
+Route_POR|POR_h0_6 = 2.5
+Route_POR|POR_h0_7 = 2.5
+Route_REN_h0|REN_7 = 2.5
+Route_REN|PAR_7 = 2.5
+Total Cost of Transportation =  190.0
+Have 8 flows from 35.0 to 36
+[('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('MUN_h0', 'FRA_h0', 2.5), ('LON_h0', 'BRI_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('REN_h0', 'POR_h0', 2.5), ('LIL_h0', 'GLO_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0)]
+BER_h0|MUN_h0 0
+BER_h0|FRA_h0 1
+MUN_h0|FRA_h0 2
+LON_h0|BRI_h0 3
+MAD_h0|BAR_h0 4
+REN_h0|POR_h0 5
+LIL_h0|GLO_h0 6
+LIS_h0|BER_h0 7
+Status: Optimal
+Route_BAR|BAR_h0_4 = 10.0
+Route_BER_h0|BER_0 = 10.0
+Route_BER_h0|BER_1 = 10.0
+Route_BER|BER_h0_7 = 1.0
+Route_BER|FRA_1 = 10.0
+Route_BER|MUN_0 = 10.0
+Route_BRI|BRI_h0_3 = 2.5
+Route_FRA|FRA_h0_1 = 10.0
+Route_FRA|FRA_h0_2 = 2.5
+Route_GLO|GLO_h0_6 = 2.5
+Route_LIL_h0|LIL_6 = 2.5
+Route_LIL|PAR_6 = 2.5
+Route_LIS_h0|LIS_7 = 1.0
+Route_LIS|BER_7 = 1.0
+Route_LIS|POR_5 = 2.5
+Route_LON_h0|LON_3 = 2.5
+Route_LON|BRI_3 = 2.5
+Route_LON|GLO_6 = 2.5
+Route_LON|LIS_5 = 2.5
+Route_MAD_h0|MAD_4 = 10.0
+Route_MAD|BAR_4 = 10.0
+Route_MUN_h0|MUN_2 = 2.5
+Route_MUN|FRA_2 = 2.5
+Route_MUN|MUN_h0_0 = 10.0
+Route_PAR|LON_5 = 2.5
+Route_PAR|LON_6 = 2.5
+Route_POR|POR_h0_5 = 2.5
+Route_REN_h0|REN_5 = 2.5
+Route_REN|PAR_5 = 2.5
+Total Cost of Transportation =  135.5
+Have 9 flows from 36 to 37.0
+[('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('MUN_h0', 'FRA_h0', 2.5), ('LON_h0', 'BRI_h0', 2.5), ('LIL_h0', 'PAR_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('REN_h0', 'POR_h0', 2.5), ('LIL_h0', 'GLO_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0)]
+BER_h0|MUN_h0 0
+BER_h0|FRA_h0 1
+MUN_h0|FRA_h0 2
+LON_h0|BRI_h0 3
+LIL_h0|PAR_h0 4
+MAD_h0|BAR_h0 5
+REN_h0|POR_h0 6
+LIL_h0|GLO_h0 7
+LIS_h0|BER_h0 8
+Status: Optimal
+Route_BAR|BAR_h0_5 = 10.0
+Route_BER_h0|BER_0 = 10.0
+Route_BER_h0|BER_1 = 10.0
+Route_BER|BER_h0_8 = 1.0
+Route_BER|FRA_1 = 10.0
+Route_BER|MUN_0 = 10.0
+Route_BRI|BRI_h0_3 = 2.5
+Route_FRA|FRA_h0_1 = 10.0
+Route_FRA|FRA_h0_2 = 2.5
+Route_GLO|GLO_h0_7 = 2.5
+Route_LIL_h0|LIL_4 = 2.5
+Route_LIL_h0|LIL_7 = 2.5
+Route_LIL|PAR_4 = 2.5
+Route_LIL|PAR_7 = 2.5
+Route_LIS_h0|LIS_8 = 1.0
+Route_LIS|BER_8 = 1.0
+Route_LIS|POR_6 = 2.5
+Route_LON_h0|LON_3 = 2.5
+Route_LON|BRI_3 = 2.5
+Route_LON|GLO_7 = 2.5
+Route_LON|LIS_6 = 2.5
+Route_MAD_h0|MAD_5 = 10.0
+Route_MAD|BAR_5 = 10.0
+Route_MUN_h0|MUN_2 = 2.5
+Route_MUN|FRA_2 = 2.5
+Route_MUN|MUN_h0_0 = 10.0
+Route_PAR|LON_6 = 2.5
+Route_PAR|LON_7 = 2.5
+Route_PAR|PAR_h0_4 = 2.5
+Route_POR|POR_h0_6 = 2.5
+Route_REN_h0|REN_6 = 2.5
+Route_REN|PAR_6 = 2.5
+Total Cost of Transportation =  143.0
+Have 8 flows from 37.0 to 38.0
+[('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('MUN_h0', 'FRA_h0', 2.5), ('LIL_h0', 'PAR_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('REN_h0', 'POR_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0), ('POR_h0', 'GLO_h0', 1.0)]
+BER_h0|MUN_h0 0
+BER_h0|FRA_h0 1
+MUN_h0|FRA_h0 2
+LIL_h0|PAR_h0 3
+MAD_h0|BAR_h0 4
+REN_h0|POR_h0 5
+LIS_h0|BER_h0 6
+POR_h0|GLO_h0 7
+Status: Optimal
+Route_BAR|BAR_h0_4 = 10.0
+Route_BER_h0|BER_0 = 10.0
+Route_BER_h0|BER_1 = 10.0
+Route_BER|BER_h0_6 = 1.0
+Route_BER|FRA_1 = 10.0
+Route_BER|MUN_0 = 10.0
+Route_FRA|FRA_h0_1 = 10.0
+Route_FRA|FRA_h0_2 = 2.5
+Route_GLO|GLO_h0_7 = 1.0
+Route_LIL_h0|LIL_3 = 2.5
+Route_LIL|PAR_3 = 2.5
+Route_LIS_h0|LIS_6 = 1.0
+Route_LIS|BER_6 = 1.0
+Route_LIS|LON_7 = 1.0
+Route_LIS|POR_5 = 2.5
+Route_LON|GLO_7 = 1.0
+Route_LON|LIS_5 = 2.5
+Route_MAD_h0|MAD_4 = 10.0
+Route_MAD|BAR_4 = 10.0
+Route_MUN_h0|MUN_2 = 2.5
+Route_MUN|FRA_2 = 2.5
+Route_MUN|MUN_h0_0 = 10.0
+Route_PAR|LON_5 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_7 = 1.0
+Route_POR|LIS_7 = 1.0
+Route_POR|POR_h0_5 = 2.5
+Route_REN_h0|REN_5 = 2.5
+Route_REN|PAR_5 = 2.5
+Total Cost of Transportation =  128.0
+Have 6 flows from 38.0 to 39.0
+[('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('LIL_h0', 'PAR_h0', 2.5), ('MAD_h0', 'BAR_h0', 10.0), ('LIS_h0', 'BER_h0', 1.0), ('POR_h0', 'GLO_h0', 1.0)]
+BER_h0|MUN_h0 0
+BER_h0|FRA_h0 1
+LIL_h0|PAR_h0 2
+MAD_h0|BAR_h0 3
+LIS_h0|BER_h0 4
+POR_h0|GLO_h0 5
+Status: Optimal
+Route_BAR|BAR_h0_3 = 10.0
+Route_BER_h0|BER_0 = 10.0
+Route_BER_h0|BER_1 = 10.0
+Route_BER|BER_h0_4 = 1.0
+Route_BER|FRA_1 = 10.0
+Route_BER|MUN_0 = 10.0
+Route_FRA|FRA_h0_1 = 10.0
+Route_GLO|GLO_h0_5 = 1.0
+Route_LIL_h0|LIL_2 = 2.5
+Route_LIL|PAR_2 = 2.5
+Route_LIS_h0|LIS_4 = 1.0
+Route_LIS|BER_4 = 1.0
+Route_LIS|LON_5 = 1.0
+Route_LON|GLO_5 = 1.0
+Route_MAD_h0|MAD_3 = 10.0
+Route_MAD|BAR_3 = 10.0
+Route_MUN|MUN_h0_0 = 10.0
+Route_PAR|PAR_h0_2 = 2.5
+Route_POR_h0|POR_5 = 1.0
+Route_POR|LIS_5 = 1.0
+Total Cost of Transportation =  105.5
+Have 5 flows from 39.0 to 40.0
+[('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('LIL_h0', 'PAR_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0), ('POR_h0', 'GLO_h0', 1.0)]
+BER_h0|MUN_h0 0
+BER_h0|FRA_h0 1
+LIL_h0|PAR_h0 2
+LIS_h0|BER_h0 3
+POR_h0|GLO_h0 4
+Status: Optimal
+Route_BER_h0|BER_0 = 10.0
+Route_BER_h0|BER_1 = 10.0
+Route_BER|BER_h0_3 = 1.0
+Route_BER|FRA_1 = 10.0
+Route_BER|MUN_0 = 10.0
+Route_FRA|FRA_h0_1 = 10.0
+Route_GLO|GLO_h0_4 = 1.0
+Route_LIL_h0|LIL_2 = 2.5
+Route_LIL|PAR_2 = 2.5
+Route_LIS_h0|LIS_3 = 1.0
+Route_LIS|BER_3 = 1.0
+Route_LON|GLO_4 = 1.0
+Route_MAD|LON_4 = 1.0
+Route_MUN|MUN_h0_0 = 10.0
+Route_PAR|PAR_h0_2 = 2.5
+Route_POR_h0|POR_4 = 1.0
+Route_POR|MAD_4 = 1.0
+Total Cost of Transportation =  75.5
+Have 9 flows from 40.0 to 41.0
+[('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('LIS_h0', 'LON_h0', 2.5), ('POR_h0', 'PAR_h0', 2.5), ('BER_h0', 'MUN_h0', 10.0), ('BER_h0', 'FRA_h0', 10.0), ('LIL_h0', 'EIN_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0), ('POR_h0', 'GLO_h0', 1.0)]
+PAR_h0|MAD_h0 0
+AMS_h0|MAD_h0 1
+LIS_h0|LON_h0 2
+POR_h0|PAR_h0 3
+BER_h0|MUN_h0 4
+BER_h0|FRA_h0 5
+LIL_h0|EIN_h0 6
+LIS_h0|BER_h0 7
+POR_h0|GLO_h0 8
+Status: Optimal
+Route_AMS_h0|AMS_1 = 2.5
+Route_AMS|EIN_6 = 2.5
+Route_AMS|FRA_1 = 2.5
+Route_BER_h0|BER_4 = 10.0
+Route_BER_h0|BER_5 = 10.0
+Route_BER|BER_h0_7 = 1.0
+Route_BER|FRA_5 = 10.0
+Route_BER|MUN_4 = 10.0
+Route_EIN|EIN_h0_6 = 2.5
+Route_FRA|FRA_h0_5 = 10.0
+Route_FRA|MAD_0 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_GLO|GLO_h0_8 = 1.0
+Route_LIL_h0|LIL_6 = 2.5
+Route_LIL|PAR_6 = 2.5
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS_h0|LIS_7 = 1.0
+Route_LIS|BER_7 = 1.0
+Route_LIS|LON_2 = 2.5
+Route_LIS|LON_3 = 2.5
+Route_LON|GLO_8 = 1.0
+Route_LON|LON_h0_2 = 2.5
+Route_LON|PAR_3 = 2.5
+Route_MAD|LON_8 = 1.0
+Route_MAD|MAD_h0_0 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_MUN|MUN_h0_4 = 10.0
+Route_PAR_h0|PAR_0 = 2.5
+Route_PAR|AMS_6 = 2.5
+Route_PAR|FRA_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR_h0|POR_8 = 1.0
+Route_POR|LIS_3 = 2.5
+Route_POR|MAD_8 = 1.0
+Total Cost of Transportation =  120.5
+Have 8 flows from 41.0 to 42.0
+[('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('LIS_h0', 'LON_h0', 2.5), ('POR_h0', 'PAR_h0', 2.5), ('BER_h0', 'MUN_h0', 10.0), ('LIL_h0', 'EIN_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0), ('POR_h0', 'GLO_h0', 1.0)]
+PAR_h0|MAD_h0 0
+AMS_h0|MAD_h0 1
+LIS_h0|LON_h0 2
+POR_h0|PAR_h0 3
+BER_h0|MUN_h0 4
+LIL_h0|EIN_h0 5
+LIS_h0|BER_h0 6
+POR_h0|GLO_h0 7
+Status: Optimal
+Route_AMS_h0|AMS_1 = 2.5
+Route_AMS|EIN_5 = 2.5
+Route_AMS|FRA_1 = 2.5
+Route_BAR|MAD_0 = 2.5
+Route_BAR|PAR_3 = 2.5
+Route_BER_h0|BER_4 = 10.0
+Route_BER|BER_h0_6 = 1.0
+Route_BER|MUN_4 = 10.0
+Route_EIN|EIN_h0_5 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_GLO|GLO_h0_7 = 1.0
+Route_LIL_h0|LIL_5 = 2.5
+Route_LIL|PAR_5 = 2.5
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS_h0|LIS_6 = 1.0
+Route_LIS|BER_6 = 1.0
+Route_LIS|LON_2 = 2.5
+Route_LIS|LON_7 = 1.0
+Route_LON|GLO_7 = 1.0
+Route_LON|LON_h0_2 = 2.5
+Route_MAD|BAR_3 = 2.5
+Route_MAD|MAD_h0_0 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_MUN|MUN_h0_4 = 10.0
+Route_PAR_h0|PAR_0 = 2.5
+Route_PAR|AMS_5 = 2.5
+Route_PAR|BAR_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR_h0|POR_7 = 1.0
+Route_POR|LIS_7 = 1.0
+Route_POR|MAD_3 = 2.5
+Total Cost of Transportation =  90.5
+Have 7 flows from 42.0 to 44.0
+[('PAR_h0', 'MAD_h0', 2.5), ('AMS_h0', 'MAD_h0', 2.5), ('LIS_h0', 'LON_h0', 2.5), ('POR_h0', 'PAR_h0', 2.5), ('BER_h0', 'MUN_h0', 10.0), ('LIL_h0', 'EIN_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0)]
+PAR_h0|MAD_h0 0
+AMS_h0|MAD_h0 1
+LIS_h0|LON_h0 2
+POR_h0|PAR_h0 3
+BER_h0|MUN_h0 4
+LIL_h0|EIN_h0 5
+LIS_h0|BER_h0 6
+Status: Optimal
+Route_AMS_h0|AMS_1 = 2.5
+Route_AMS|EIN_5 = 2.5
+Route_AMS|FRA_1 = 2.5
+Route_BAR|MAD_0 = 2.5
+Route_BER_h0|BER_4 = 10.0
+Route_BER|BER_h0_6 = 1.0
+Route_BER|MUN_4 = 10.0
+Route_EIN|EIN_h0_5 = 2.5
+Route_FRA|MAD_1 = 2.5
+Route_LIL_h0|LIL_5 = 2.5
+Route_LIL|PAR_5 = 2.5
+Route_LIS_h0|LIS_2 = 2.5
+Route_LIS_h0|LIS_6 = 1.0
+Route_LIS|BER_6 = 1.0
+Route_LIS|LON_2 = 2.5
+Route_LIS|LON_3 = 2.5
+Route_LON|LON_h0_2 = 2.5
+Route_LON|PAR_3 = 2.5
+Route_MAD|MAD_h0_0 = 2.5
+Route_MAD|MAD_h0_1 = 2.5
+Route_MUN|MUN_h0_4 = 10.0
+Route_PAR_h0|PAR_0 = 2.5
+Route_PAR|AMS_5 = 2.5
+Route_PAR|BAR_0 = 2.5
+Route_PAR|PAR_h0_3 = 2.5
+Route_POR_h0|POR_3 = 2.5
+Route_POR|LIS_3 = 2.5
+Total Cost of Transportation =  85.5
+Have 1 flows from 44.0 to 45
+[('LIS_h0', 'BER_h0', 1.0)]
+LIS_h0|BER_h0 0
+Status: Optimal
+Route_BER|BER_h0_0 = 1.0
+Route_LIS_h0|LIS_0 = 1.0
+Route_LIS|BER_0 = 1.0
+Total Cost of Transportation =  3.0
+Have 5 flows from 45 to 49.0
+[('AMS_h0', 'PAR_h0', 2.5), ('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('MAD_h0', 'AMS_h0', 2.5), ('LIS_h0', 'BER_h0', 1.0)]
+AMS_h0|PAR_h0 0
+LON_h0|BAR_h0 1
+POR_h0|LON_h0 2
+MAD_h0|AMS_h0 3
+LIS_h0|BER_h0 4
+Status: Optimal
+Route_AMS_h0|AMS_0 = 2.5
+Route_AMS|AMS_h0_3 = 2.5
+Route_AMS|PAR_0 = 2.5
+Route_BAR|BAR_h0_1 = 10.0
+Route_BER|BER_h0_4 = 1.0
+Route_FRA|AMS_3 = 2.5
+Route_LIS_h0|LIS_4 = 1.0
+Route_LIS|BER_4 = 1.0
+Route_LIS|LON_2 = 10.0
+Route_LON_h0|LON_1 = 10.0
+Route_LON|LON_h0_2 = 10.0
+Route_LON|MAD_1 = 10.0
+Route_MAD_h0|MAD_3 = 2.5
+Route_MAD|BAR_1 = 10.0
+Route_MAD|FRA_3 = 2.5
+Route_PAR|PAR_h0_0 = 2.5
+Route_POR_h0|POR_2 = 10.0
+Route_POR|LIS_2 = 10.0
+Total Cost of Transportation =  100.5
+Have 3 flows from 49.0 to 50.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0), ('LIS_h0', 'BER_h0', 1.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+LIS_h0|BER_h0 2
+Status: Optimal
+Route_BAR|BAR_h0_0 = 10.0
+Route_BER|BER_h0_2 = 1.0
+Route_LIS_h0|LIS_2 = 1.0
+Route_LIS|BER_2 = 1.0
+Route_LIS|LON_1 = 10.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|PAR_0 = 10.0
+Route_PAR|BAR_0 = 10.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|LIS_1 = 10.0
+Total Cost of Transportation =  83.0
+Have 2 flows from 50.0 to 55.0
+[('LON_h0', 'BAR_h0', 10.0), ('POR_h0', 'LON_h0', 10.0)]
+LON_h0|BAR_h0 0
+POR_h0|LON_h0 1
+Status: Optimal
+Route_BAR|BAR_h0_0 = 10.0
+Route_LON_h0|LON_0 = 10.0
+Route_LON|LON_h0_1 = 10.0
+Route_LON|PAR_0 = 10.0
+Route_MAD|LON_1 = 10.0
+Route_PAR|BAR_0 = 10.0
+Route_POR_h0|POR_1 = 10.0
+Route_POR|MAD_1 = 10.0
+Total Cost of Transportation =  80.0
+Have 0 flows from 55.0 to 60
+[]
+Status: Optimal
+__dummy = None
+Total Cost of Transportation =  None

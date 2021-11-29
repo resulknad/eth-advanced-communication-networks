@@ -1,79 +1,20 @@
 import json
 import pandas as pd
 from collections import defaultdict
-class Node:
-
-    def __init__(self, name, obj):
-        self.edges = []
-        self.edges_map = {}
-        self.name = name
-        self.obj = obj
-
-    def add_edge(self, e):
-        self.edges.append(e)
-
-        other = e.target if e.source == self.name else e.source
-        self.edges_map[other] = e
-
-class Edge:
-    target = ""
-    source = ""
-    delay = ""
-    bw = ""
-    def __init__(self, source, target, delay, bw):
-        self.source = source
-        self.target = target
-        self.delay = delay
-        self.bw = bw
-
-    def __repr__(self):
-        return self.source + "|" + self.target
-
-class Graph:
-    edges = []
-    nodes = {}
-    def __init__(self, top_file):
-        self.edges = []
-        self.edges_map = {}
-        self.nodes = {}
-        self._read_json(top_file)
-
-
-    def _read_json(self, top_file):
-        with open(top_file) as json_file:
-            data = json.load(json_file)
-            for n in data['nodes']:
-                name = n['id']
-                self.nodes[name] = Node(name, n)
-            
-            for l in data['links']:
-                #print(l)
-                source = l['node1']
-                target = l['node2']
-                delay = l.get('delay')
-                bw = l['bw'] if 'bw' in l else 100
-
-                e = Edge(source, target, delay, bw)
-                self.nodes[source].add_edge(e)
-                self.nodes[target].add_edge(e)
-                self.edges.append(e)
-                self.edges_map[str(e)] = e
-
-                # add reverse edge
-                e = Edge(target, source, delay, bw)
-                self.nodes[source].add_edge(e)
-                self.nodes[target].add_edge(e)
-                self.edges.append(e)
-                self.edges_map[str(e)] = e
-
 from pulp import *
-
+import collections
 class MCF:
     def __init__(self, graph):
         self.graph = graph
         self.commodities = []
+        self.paths = []
 
     def add_commodity(self, source, target, demand):
+        for (indx,(s,t,d)) in enumerate(self.commodities):
+            if (s,t) == (source,target):
+                print("WARNING: already have commodity for ",s,t, ". Will use max demand out of ",demand,d)
+                self.commodities[indx] = (s,t,max(d,demand))
+                return
         self.commodities.append((source, target, demand))
 
     def make_lp(self):
@@ -153,71 +94,55 @@ class MCF:
                 "%s_%s_conservation_ga"%(node.name, c)
         return prob
 
-    def make_and_solve_lp(self):
+    def make_and_solve_lp(self, verbose=False):
         prob = self.make_lp()
-
-        # prob.writeLP("MCF.lp")
         prob.solve(PULP_CBC_CMD(msg=0))
 
-        # The status of the solution is printed to the screen
-        print("Status:", LpStatus[prob.status])
+        if verbose:
+            print("Status:", LpStatus[prob.status])
 
-        # Each of the variables is printed with it's resolved optimum value
+        # construct paths out of LP result
+        result = [{} for _ in self.commodities]
         for v in prob.variables():
             if v.varValue != 0.0:
-                print (v.name, "=", v.varValue)
+                if v.name.startswith("Route_"):
+                    edge_name = v.name[6:]
+                    from_to, commodity = edge_name[:edge_name.rindex("_")], edge_name[edge_name.rindex("_")+1:]
+                    nodes = from_to.split("|")
+                    src,dst = nodes[0],nodes[1]
+                    result[int(commodity)][src] = dst
+                if verbose:
+                    print("edge from",src,"to",dst,"commodity",commodity)
+                    print (v.name, "=", v.varValue)
 
-        # The optimised objective function value is printed to the screen    
-        print ("Total Cost of Transportation = ", value(prob.objective))
+        paths = collections.defaultdict(list)
 
-# read topology
-g = Graph("topology.json")
+        # reconstruct paths out of adjencency lists for paths
+        for c in range(len(self.commodities)):
+            src,dst,_ = self.commodities[c]
 
-# read base traffic
-df = pd.read_csv("full.traffic-base")
-df = df.rename(columns=lambda x: x.strip())
+            n = src
+            path = []
+            # as long as we have not reached end, continue
+            while n in result[c]:
+                path.append(n)
+                n = result[c][n]
+            
+            path.append(n)
+            
+            if len(path) > 2:
+                src,dst = path[0],path[-1]
+                paths[(src,dst)].append(path)
+                # add reverse path
+                paths[(dst,src)].append(path[::-1])
+            else:
+               print("WARNING: found path of length <=2, something is wrong with LP solution", path)
 
-curr_time = 0
+        self.paths = paths
 
-# map flows defined in terms of size to bandwidth + time pairs
-default_bw = 2.5
-rows = df[pd.isna(df['rate'])]
-for i,r in rows.iterrows():
-    # TODO: parse megabytes and Mbps etc.
-    size = int(r['size'][:-2])
+        if verbose:
+            print("Paths: ", self.paths)
+            print ("Total Cost of Transportation = ", value(prob.objective))
 
-    rate = default_bw
-    df.loc[i, 'rate'] = str(rate) + "Mbps"
-    df.loc[i,'duration'] = size / rate
-
-# add end_time everywhere
-df['end_time'] = df['start_time'] + df['duration']
-
-# find points in time where either 1. a flow starts or 2. a flow end
-intervals = list(set(list(df['end_time']) + list(df['start_time'])))
-
-# append scenario end time
-intervals.append(60)
-
-# sort
-intervals = sorted(intervals)
-
-start_time = 0
-for end_time in intervals:
-    flows = df[(df['start_time']<=start_time) &
-                (df['end_time'] >= end_time)]
-
-    print("Have {} flows from {} to {}".format(flows.shape[0], start_time, end_time))
-    m = MCF(g)
-    for (i,f) in flows.iterrows():
-        #TOOD: properly parse Mbps for rate
-        m.add_commodity(f['src'], f['dst'], float(f['rate'][:-4]))
-    print(m.commodities)
-    m.make_and_solve_lp()
-    start_time = end_time
-
-
-
-
-import sys
-sys.exit(1)
+    def get_paths(self):
+        return self.paths

@@ -39,6 +39,8 @@ control MyIngress(inout headers hdr,
     register<bit<ID_WIDTH>>(REGISTER_SIZE) flowlet_to_id;
     register<bit<TIMESTAMP_WIDTH>>(REGISTER_SIZE) flowlet_time_stamp;
 
+    action no_action() {
+    }
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -123,6 +125,18 @@ control MyIngress(inout headers hdr,
         meta.ecmp_group_id = ecmp_group_id;
     }
 
+    table virtual_circuit {
+        key = {
+            hdr.ipv4.srcAddr: exact;
+            hdr.ipv4.dstAddr: exact;
+        }
+        actions = {
+            ecmp_group;
+            no_action;
+        }
+        default_action = no_action;
+        size = 256;
+    }
     /*
      * This table is the first one to be applied.
      * - For directly connected hosts, it should contain the set_nhop action to forward based on IPv4.
@@ -256,6 +270,33 @@ control MyIngress(inout headers hdr,
         size = 256;
     }
 
+    table virtual_circuit_path {
+        key = {
+            meta.ecmp_group_id: exact;
+            meta.ecmp_hash: exact;
+        }
+        actions = {
+            mpls_ingress_1_hop;
+            mpls_ingress_2_hop;
+            mpls_ingress_3_hop;
+            mpls_ingress_4_hop;
+            mpls_ingress_5_hop;
+            mpls_ingress_6_hop;
+            mpls_ingress_7_hop;
+            mpls_ingress_8_hop;
+            mpls_ingress_9_hop;
+            mpls_ingress_10_hop;
+            mpls_ingress_11_hop;
+            mpls_ingress_12_hop;
+            mpls_ingress_13_hop;
+            mpls_ingress_14_hop;
+            mpls_ingress_15_hop;
+            mpls_ingress_16_hop;
+            drop;
+        }
+        default_action = drop;
+        size = 256;
+    }
     action mpls_forward(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
         // TODO: this is not what happens in reality
@@ -342,11 +383,20 @@ control MyIngress(inout headers hdr,
                 get_random_flowlet_id();
             }
 
-            switch (ipv4_lpm.apply().action_run) {
+            switch (virtual_circuit.apply().action_run) {
                 ecmp_group: {
-                    ecmp_FEC_tbl.apply();
+                    virtual_circuit_path.apply();
+                }
+                no_action: {
+                    switch (ipv4_lpm.apply().action_run) {
+                        ecmp_group: {
+                            ecmp_FEC_tbl.apply();
+                        }
+                    }
                 }
             }
+
+
         }
 
         // handle MPLS packets (note that they may have just become MPLS packets by applying the tables above)

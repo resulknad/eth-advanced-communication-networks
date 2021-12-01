@@ -67,8 +67,8 @@ class MCF:
         (s, t, d, cm) = self.commodities[index[0][0]]
         self.commodities[index[0][0]] = ("", "", 0, 0)
         assert s == source and t == target
-        commodity1 = self.add_commodity(s, waypoint, d, True)
-        commodity2 = self.add_commodity(waypoint, t, d, True)
+        commodity1 = self.add_commodity(s, waypoint, d, True, cost_multiplier=cm)
+        commodity2 = self.add_commodity(waypoint, t, d, True, cost_multiplier=cm)
 
         self.waypoints[(source, target)] = (waypoint, commodity1, commodity2)
 

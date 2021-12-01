@@ -144,7 +144,7 @@ class Controller(object):
                 if (f["src"], f["dst"]) in pairs or (
                     (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
                 ):
-                    cost_multiplier = 10 if f["protocol"] == "udp" else 1
+                    cost_multiplier = 2 if f["protocol"] == "udp" else 1
                     bw_multiplier = 1 if f["protocol"] == "udp" else 2
                     # TOOD: properly parse Mbps for rate
                     m.add_commodity(

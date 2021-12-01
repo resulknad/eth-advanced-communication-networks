@@ -48,6 +48,52 @@ class Controller(object):
         df["end_time"] = df["start_time"] + df["duration"]
         return df
 
+    def _preprocess_slas(self, slas):
+        df = pd.read_csv(slas)
+        df = df.rename(columns=lambda x: x.strip())
+
+        # -1 will be value for wildcard
+
+        print(df["sport"])
+        df["sport"] = df["sport"].str.replace("*", "-1")
+        print(df["sport"])
+        sport = df["sport"].str.split("--", n=1, expand=True)
+        df["sport_start"], df["sport_end"] = sport[0].astype("int32"), sport[1].astype(
+            "int32"
+        )
+
+        df["dport"] = df["dport"].str.replace("*", "-1")
+        dport = df["dport"].str.split("--", n=1, expand=True)
+        df["dport_start"], df["dport_end"] = dport[0].astype("int32"), dport[1].astype(
+            "int32"
+        )
+
+        self.filtered_slas = df[
+            (df["type"] == "wp")
+            | (
+                (df["sport_start"] <= 100)
+                & (df["sport_end"] <= 100)
+                & (df["dport_start"] <= 100)
+                & (df["dport_end"] <= 100)
+            )
+        ]
+
+    def _sla_applies(self, from_host, from_port, to_host, to_port):
+        relevant_slas = []
+        for (indx, sla) in self.filtered_slas.iterrows():
+            src_match = sla.src == "*" or sla.src == from_host
+            src_port_match = (sla.sport_start <= from_port) and (
+                sla.sport_end == -1 or sla.sport_end >= from_port
+            )
+            dst_match = sla.dst == "*" or sla.dst == to_host
+            dst_port_match = (sla.dport_start <= to_port) and (
+                sla.dport_end == -1 or sla.dport_end >= to_port
+            )
+
+            if src_match and src_port_match and dst_match and dst_port_match:
+                relevant_slas.append(sla)
+        return relevant_slas
+
     def _get_waypoints(self, slas):
         df = pd.read_csv(slas)
         df = df.rename(columns=lambda x: x.strip())
@@ -56,8 +102,10 @@ class Controller(object):
         return wps[["src", "dst", "target"]].values.tolist()
 
     def init_mcf(self, base_traffic, topology, slas):
+        self._preprocess_slas(slas)
+
         # read topology
-        g = Graph("topology.json")
+        g = Graph(topology)
 
         df = self._preprocess_base_traffic(base_traffic)
         # find points in time where either 1. a flow starts or 2. a flow end
@@ -83,13 +131,14 @@ class Controller(object):
             )
             m = MCF(g)
             for (i, f) in flows.iterrows():
-                # TOOD: properly parse Mbps for rate
-                m.add_commodity(
-                    f["src"],
-                    f["dst"],
-                    float(f["rate"][:-4])
-                    * ((f["end_time"] - f["start_time"]) / interval_length),
-                )
+                if self._sla_applies(f["src"], f["sport"], f["dst"], f["dport"]):
+                    # TOOD: properly parse Mbps for rate
+                    m.add_commodity(
+                        f["src"],
+                        f["dst"],
+                        float(f["rate"][:-4])
+                        * ((f["end_time"] - f["start_time"]) / interval_length),
+                    )
 
             # adding wps
             wps = self._get_waypoints(slas)

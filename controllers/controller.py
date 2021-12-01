@@ -68,7 +68,7 @@ class Controller(object):
             "int32"
         )
 
-        self.filtered_slas = df[
+        df = df[
             (df["type"] == "wp")
             | (
                 (df["sport_start"] <= 100)
@@ -77,6 +77,7 @@ class Controller(object):
                 & (df["dport_end"] <= 100)
             )
         ]
+        self.filtered_slas = df
 
     def _sla_applies(self, from_host, from_port, to_host, to_port):
         relevant_slas = []
@@ -130,8 +131,17 @@ class Controller(object):
                 )
             )
             m = MCF(g)
+
+            # for which pairs are we going to establish a virtual circuti?
+            pairs = {}
             for (i, f) in flows.iterrows():
                 if self._sla_applies(f["src"], f["sport"], f["dst"], f["dport"]):
+                    pairs[tuple(sorted([f["src"], f["dst"]]))] = True
+
+            # make sure to consider all of the flows inbetween the two endpoints
+            # since we do not differentiate based on protocol / port atm for virtual circuits
+            for (i, f) in flows.iterrows():
+                if tuple(sorted([f["src"], f["dst"]])) in pairs:
                     # TOOD: properly parse Mbps for rate
                     m.add_commodity(
                         f["src"],

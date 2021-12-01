@@ -144,13 +144,14 @@ class Controller(object):
                 if (f["src"], f["dst"]) in pairs or (
                     (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
                 ):
-                    cost_multiplier = 2 if f["protocol"] == "udp" else 1
-                    bw_multiplier = 1 if f["protocol"] == "udp" else 2
+                    cost_multiplier = 1 if f["protocol"] == "udp" else 1
+                    bw_multiplier = 1 if f["protocol"] == "udp" else 1
                     # TOOD: properly parse Mbps for rate
+                    bw = float(f["rate"][:-4]) * bw_multiplier
                     m.add_commodity(
                         f["src"],
                         f["dst"],
-                        float(f["rate"][:-4]) * bw_multiplier,
+                        bw,
                         cost_multiplier=cost_multiplier
                         # * ((f["end_time"] - f["start_time"]) / interval_length),
                     )
@@ -160,7 +161,7 @@ class Controller(object):
                         m.add_commodity(
                             f["dst"],
                             f["src"],
-                            0.1,
+                            bw / 5,
                         )
 
             # adding wps

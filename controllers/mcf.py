@@ -28,6 +28,9 @@ class MCF:
                 return
         self.commodities.append((source, target, demand))
 
+    def add_waypont(self, source, target, waypoint):
+        pass
+
     def make_lp(self):
         prob = LpProblem("Problem", LpMinimize)
 
@@ -127,7 +130,7 @@ class MCF:
 
     def make_and_solve_lp(self, verbose=False):
         prob = self.make_lp()
-        prob.writeLP("test.lp")
+        # prob.writeLP("test.lp")
         prob.solve(PULP_CBC_CMD(msg=0))
 
         if verbose:

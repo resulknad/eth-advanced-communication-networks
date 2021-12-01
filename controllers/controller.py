@@ -71,10 +71,10 @@ class Controller(object):
         df = df[
             (df["type"] == "wp")
             | (
-                (df["sport_start"] <= 275)
-                & (df["sport_end"] <= 275)
-                & (df["dport_start"] <= 275)
-                & (df["dport_end"] <= 275)
+                (df["sport_start"] <= 100)
+                & (df["sport_end"] <= 100)
+                & (df["dport_start"] <= 100)
+                & (df["dport_end"] <= 100)
             )
         ]
         self.filtered_slas = df
@@ -145,11 +145,12 @@ class Controller(object):
                     (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
                 ):
                     cost_multiplier = 10 if f["protocol"] == "udp" else 1
+                    bw_multiplier = 1 if f["protocol"] == "udp" else 2
                     # TOOD: properly parse Mbps for rate
                     m.add_commodity(
                         f["src"],
                         f["dst"],
-                        float(f["rate"][:-4]),
+                        float(f["rate"][:-4]) * bw_multiplier,
                         cost_multiplier=cost_multiplier
                         # * ((f["end_time"] - f["start_time"]) / interval_length),
                     )

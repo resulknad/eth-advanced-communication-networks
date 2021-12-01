@@ -19,16 +19,14 @@ TOTAL_TIME = 60
 class Controller(object):
     def __init__(self, base_traffic, slas):
         self.base_traffic_file = base_traffic
+        self.slas_file = slas
         self.start_time = 0
         self.topo = load_topo("topology.json")
         self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
-        self.init_mcf(base_traffic, "topology.json")
+        self.init_mcf(base_traffic, "topology.json", slas)
         self.init()
 
-    def init_mcf(self, base_traffic, topology):
-        # read topology
-        g = Graph("topology.json")
-
+    def _preprocess_base_traffic(self, base_traffic):
         # read base traffic
         df = pd.read_csv(base_traffic)
         df = df.rename(columns=lambda x: x.strip())
@@ -48,7 +46,20 @@ class Controller(object):
 
         # add end_time everywhere
         df["end_time"] = df["start_time"] + df["duration"]
+        return df
 
+    def _get_waypoints(self, slas):
+        df = pd.read_csv(slas)
+        df = df.rename(columns=lambda x: x.strip())
+
+        wps = df[df["type"] == "wp"]
+        return wps[["src", "dst", "target"]].values.tolist()
+
+    def init_mcf(self, base_traffic, topology, slas):
+        # read topology
+        g = Graph("topology.json")
+
+        df = self._preprocess_base_traffic(base_traffic)
         # find points in time where either 1. a flow starts or 2. a flow end
         intervals = list(set(list(df["end_time"]) + list(df["start_time"])))
 
@@ -79,6 +90,12 @@ class Controller(object):
                     float(f["rate"][:-4])
                     * ((f["end_time"] - f["start_time"]) / interval_length),
                 )
+
+            # adding wps
+            wps = self._get_waypoints(slas)
+            for (src, target, wp) in wps:
+                m.add_waypoint(src, target, wp)
+
             m.make_and_solve_lp()
             m.print_paths_summary()
             self.time_path_pairs.append((start_time, m.get_paths()))

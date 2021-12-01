@@ -61,7 +61,8 @@ class MCF:
                 "ERROR: cannot have multiple commodities for one src target pair. FAILING"
             )
 
-        (s, t, d) = self.commodities.pop(index[0][0])
+        (s, t, d) = self.commodities[index[0][0]]
+        self.commodities[index[0][0]] = ("", "", 0)
         assert s == source and t == target
         commodity1 = self.add_commodity(s, waypoint, d, True)
         commodity2 = self.add_commodity(waypoint, t, d, True)
@@ -135,6 +136,8 @@ class MCF:
         # (except for supply / demand nodes)
         for c in range(len(self.commodities)):
             src, target, demand = self.commodities[c]
+            if src == "":
+                continue
             for (name, node) in self.graph.nodes.items():
                 outgoing = list(filter(lambda s: s.startswith(name + "|"), edges_str))
                 incoming = list(filter(lambda s: s.endswith("|" + name), edges_str))
@@ -180,7 +183,7 @@ class MCF:
             prob += (
                 excess_variables["{}|{}_commodity{}".format(c1_src, c1_target, c1)]
                 == excess_variables["{}|{}_commodity{}".format(c2_src, c2_target, c2)],
-                "%s_waypoint" % e,
+                "%s_%s_%s_waypoint" % (c1_src, c1_target, c2_target),
             )
         return prob
 
@@ -277,26 +280,34 @@ class MCF:
                 assert (waypoint, target, commodity2) not in all_paths
                 continue
 
+            for (k, v) in all_paths.items():
+                print(k, v)
+            print(src, target, waypoint)
             # the two parts of the waypoints are removed
             # we do not want to use them on their own,
             # only together
             src_wp_paths = all_paths.pop((src, waypoint, commodity1))
             del all_paths[(waypoint, src, commodity1)]
 
-            dst_wp_paths = all_paths.pop((waypoint, dst, commodity2))
-            del all_paths[(dst, waypoint, commodity2)]
+            dst_wp_paths = all_paths.pop((waypoint, target, commodity2))
+            del all_paths[(target, waypoint, commodity2)]
 
-            self.paths[(src, dst)] = [
+            self.paths[(src, target)] = [
                 p1 + p2[1:] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
 
             # reverse
-            self.paths[(dst, src)] = [p[::-1] for p in self.paths[(src, dst)]]
+            self.paths[(target, src)] = [p[::-1] for p in self.paths[(src, target)]]
 
         # add non-waypointed paths
-        for (src, dst, _), paths in all_paths.items():
-            self.paths[src, dst] = paths
+        for (src, dst, cid), paths in all_paths.items():
 
+            self.paths[src, dst] = paths
+        #         if (not src.endswith("_h0") or not dst.endswith("_h0")) and len(paths) > 0:
+        #             print(cid)
+        #             print(self.waypoints)
+        #             print("fail", paths)
+        #             1 / 0
         if verbose:
             print("Paths: ", self.paths)
             print("Total Cost of Transportation = ", value(prob.objective))

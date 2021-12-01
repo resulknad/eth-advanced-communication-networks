@@ -52,20 +52,38 @@ class MCFTestCase(unittest.TestCase):
 
         # first check that without waypoint we dont go via MAN
         mcf = MCF(self.graph)
-        mcf.add_commodity("LIS", "BER", 10)
+        mcf.add_commodity("LIS", "BER", 5)
         mcf.make_and_solve_lp()
 
         paths = mcf.get_paths()
-        print(paths)
+        # print(paths)
         self.assertNotIn("MAN", paths[("LIS", "BER")][0])
 
         # now we add the waypoint and the path should contain MAN
         mcf = MCF(self.graph)
         mcf.add_commodity("LIS", "BER", 10)
+        # mcf.add_commodity("LON", "BER", 10)
         mcf.add_waypoint("LIS", "BER", "MAN")
         mcf.make_and_solve_lp()
         paths = mcf.get_paths()
+
         self.assertIn("MAN", paths[("LIS", "BER")][0])
+
+    def test_waypointing_with_simple_paths(self):
+        # test whether waypointing works if:
+        # commodity1 with waypoint: LIS -- LON --> BER
+        # commodity2 w/o  waypointL LIS -> LON
+
+        # now we add the waypoint and the path should contain MAN
+        mcf = MCF(self.graph)
+        mcf.add_commodity("LIS", "BER", 10)
+        mcf.add_commodity("LIS", "LON", 10)
+
+        mcf.add_waypoint("LIS", "BER", "LON")
+        mcf.make_and_solve_lp()
+        paths = mcf.get_paths()
+        self.assertIn("LON", paths[("LIS", "BER")][0])
+        self.assertEqual(paths[("LIS", "LON")], [["LIS", "LON"]])
 
 
 if __name__ == "__main__":

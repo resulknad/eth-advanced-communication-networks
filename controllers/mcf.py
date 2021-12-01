@@ -8,28 +8,65 @@ class MCF:
     def __init__(self, graph):
         self.graph = graph
         self.commodities = []
-        self.paths = []
+        self.paths = {}
+        self.waypoints = {}
 
-    def add_commodity(self, source, target, demand):
+    def add_commodity(self, source, target, demand, allow_dup_commodity=False):
         # flow is independent of order
         if source < target:
             source, target = target, source
-        for (indx, (s, t, d)) in enumerate(self.commodities):
-            if (s, t) == (source, target):
-                print(
-                    "WARNING: already have commodity for ",
-                    s,
-                    t,
-                    ". Will add requested demand to it ",
-                    demand,
-                    d + demand,
-                )
-                self.commodities[indx] = (s, t, d + demand)
-                return
+        if not allow_dup_commodity:
+            for (indx, (s, t, d)) in enumerate(self.commodities):
+                if (s, t) == (source, target):
+                    print(
+                        "WARNING: already have commodity for ",
+                        s,
+                        t,
+                        ". Will add requested demand to it ",
+                        demand,
+                        d + demand,
+                    )
+                    self.commodities[indx] = (s, t, d + demand)
+                    return
         self.commodities.append((source, target, demand))
+        return len(self.commodities) - 1
 
     def add_waypoint(self, source, target, waypoint):
-        pass
+        if source < target:
+            source, target = target, source
+        if (source, target) in self.waypoints:
+            print(
+                "WARNING: already have a waypoint for {} --- {} ----> {}. since a call to waypoints makes changes to the commodities"
+                + ", it is of crucial importance to call add_waypoint after setting up all commodoties and only once. IGNORING".format(
+                    source, waypoint, target
+                )
+            )
+            return
+
+        index = list(
+            filter(
+                lambda tpl: tpl[1][0] == source and tpl[1][1] == target,
+                enumerate(self.commodities),
+            )
+        )
+        if len(index) == 0:
+            print(
+                "WARNING: cannot add waypoint {} --- {} ----> {} for commodity/flow which has not been added yet. IGNORING.".format(
+                    source, waypoint, target
+                )
+            )
+            return
+        if len(index) > 1:
+            raise Warning(
+                "ERROR: cannot have multiple commodities for one src target pair. FAILING"
+            )
+
+        (s, t, d) = self.commodities.pop(index[0][0])
+        assert s == source and t == target
+        commodity1 = self.add_commodity(s, waypoint, d, True)
+        commodity2 = self.add_commodity(waypoint, t, d, True)
+
+        self.waypoints[(source, target)] = (waypoint, commodity1, commodity2)
 
     def make_lp(self):
         prob = LpProblem("Problem", LpMinimize)
@@ -68,7 +105,15 @@ class MCF:
             + lpSum([excess_variables[e] * (2 ** 16) for e in excess_edges_str]),
             "Sum_of_edge_commodity_cost",
         )
-
+        # + lpSum(
+        #      [
+        #          (
+        #              excess_variables["LON|LIS_commodity0"]
+        #              - excess_variables["LON|BER_commodity1"]
+        #          )
+        #          * (2 ** 32)
+        #          for e in excess_edges_str
+        #      ]
         # add capacity constaints
         # if edge is bidirectional, capacity must hold for both
         for (n1, n2) in itertools.combinations(nodes_str, 2):
@@ -125,12 +170,23 @@ class MCF:
                     node.name,
                     c,
                 )
-                "%s_%s_conservation_ga" % (node.name, c)
+        # add waypoint constraints
+        # basically we split a commodity into two commodities
+        # and now require that either both are satisfied to the same degree
+        # or not at all (by requiring that excess is equal)
+        for (src, target), (_, c1, c2) in self.waypoints.items():
+            c1_src, c1_target, _ = self.commodities[c1]
+            c2_src, c2_target, _ = self.commodities[c2]
+            prob += (
+                excess_variables["{}|{}_commodity{}".format(c1_src, c1_target, c1)]
+                == excess_variables["{}|{}_commodity{}".format(c2_src, c2_target, c2)],
+                "%s_waypoint" % e,
+            )
         return prob
 
     def make_and_solve_lp(self, verbose=False):
         prob = self.make_lp()
-        # prob.writeLP("test.lp")
+        prob.writeLP("test.lp")
         prob.solve(PULP_CBC_CMD(msg=0))
 
         if verbose:
@@ -202,10 +258,44 @@ class MCF:
 
             # and reverse paths
             paths_reversed = [p[::-1] for p in paths]
+            all_paths[(src, dst, c)] = paths
+            all_paths[(dst, src, c)] = paths_reversed
 
-            all_paths[(src, dst)] = paths
-            all_paths[(dst, src)] = paths_reversed
-        self.paths = all_paths
+        self.paths = {}
+        # combine waypointed paths
+        for (
+            (src, target),
+            (waypoint, commodity1, commodity2),
+        ) in self.waypoints.items():
+            if (src, waypoint, commodity1) not in all_paths:
+                print(
+                    "WARNING: could not satisfy waypoint {}-- {} -- > {}",
+                    src,
+                    target,
+                    waypoint,
+                )
+                assert (waypoint, target, commodity2) not in all_paths
+                continue
+
+            # the two parts of the waypoints are removed
+            # we do not want to use them on their own,
+            # only together
+            src_wp_paths = all_paths.pop((src, waypoint, commodity1))
+            del all_paths[(waypoint, src, commodity1)]
+
+            dst_wp_paths = all_paths.pop((waypoint, dst, commodity2))
+            del all_paths[(dst, waypoint, commodity2)]
+
+            self.paths[(src, dst)] = [
+                p1 + p2[1:] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
+            ]
+
+            # reverse
+            self.paths[(dst, src)] = [p[::-1] for p in self.paths[(src, dst)]]
+
+        # add non-waypointed paths
+        for (src, dst, _), paths in all_paths.items():
+            self.paths[src, dst] = paths
 
         if verbose:
             print("Paths: ", self.paths)

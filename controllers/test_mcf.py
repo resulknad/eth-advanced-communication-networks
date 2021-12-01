@@ -29,6 +29,9 @@ class MCFTestCase(unittest.TestCase):
             ],
         )
 
+        # no reverse paths
+        self.assertNotIn(("BER", "LIS"), paths)
+
     def test_infeasible(self):
         # setup LP with infeasible constraints
         # expect that the longer of the two (more expensive one)
@@ -45,6 +48,9 @@ class MCFTestCase(unittest.TestCase):
 
         # this one exists
         self.assertEqual(len(paths[("PAR", "REN")]), 1)
+
+        # but not its reverse
+        self.assertNotIn(("REN", "PAR"), paths)
 
     def test_waypointing(self):
         # setup LP with waypoint constraint which is definitively
@@ -76,6 +82,7 @@ class MCFTestCase(unittest.TestCase):
 
         # now we add the waypoint and the path should contain MAN
         mcf = MCF(self.graph)
+
         mcf.add_commodity("LIS", "BER", 10)
         mcf.add_commodity("LIS", "LON", 10)
 
@@ -83,6 +90,46 @@ class MCFTestCase(unittest.TestCase):
         mcf.make_and_solve_lp()
         paths = mcf.get_paths()
         self.assertIn("LON", paths[("LIS", "BER")][0])
+
+        # this one needs to take a detour since link LIS -> LONDON is saturated...
+        self.assertEqual(paths[("LIS", "LON")], [["LIS", "POR", "MAD", "LON"]])
+
+    def test_full_duplex(self):
+        # links support in both directions 10Mbits
+        # so we need to model it as such
+
+        mcf = MCF(self.graph)
+        mcf.add_commodity("LIS", "LON", 10)
+        mcf.add_commodity("LON", "LIS", 10)
+        mcf.make_and_solve_lp()
+        paths = mcf.get_paths()
+        self.assertEqual(paths[("LIS", "LON")], [["LIS", "LON"]])
+        self.assertEqual(paths[("LON", "LIS")], [["LON", "LIS"]])
+
+    def test_cost_multiplier(self):
+        # example constructed s.t. it is cheaper for the LP
+        # to take a detour for LIS -> LON without modifying the cost multiplier
+        mcf = MCF(self.graph)
+        mcf.add_commodity("POR", "LON", 10)
+        mcf.add_commodity("LIS", "BRI", 10)
+        mcf.add_commodity("MAD", "LON", 10)
+        mcf.add_commodity("LIS", "LON", 10, cost_multiplier=1)
+
+        mcf.make_and_solve_lp()
+        paths = mcf.get_paths()
+        self.assertNotEqual(paths[("LIS", "LON")], [["LIS", "LON"]])
+
+        # now with cost multiplier
+        # this forces the LP to choose the shortest path for this commodity
+        # because its cheaper to extend the others
+        mcf = MCF(self.graph)
+        mcf.add_commodity("POR", "LON", 10)
+        mcf.add_commodity("LIS", "BRI", 10)
+        mcf.add_commodity("MAD", "LON", 10)
+        mcf.add_commodity("LIS", "LON", 10, cost_multiplier=10)
+
+        mcf.make_and_solve_lp()
+        paths = mcf.get_paths()
         self.assertEqual(paths[("LIS", "LON")], [["LIS", "LON"]])
 
 

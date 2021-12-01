@@ -6,6 +6,8 @@ from typing import Dict, List
 
 from itertools import product
 
+from pulp.apis import cplex_api
+
 from graph import Graph
 from mcf import MCF
 import pandas as pd
@@ -134,20 +136,31 @@ class Controller(object):
             pairs = {}
             for (i, f) in flows.iterrows():
                 if self._sla_applies(f["src"], f["sport"], f["dst"], f["dport"]):
-                    pairs[tuple(sorted([f["src"], f["dst"]]))] = True
+                    pairs[(f["src"], f["dst"])] = True
 
             # make sure to consider all of the flows inbetween the two endpoints
             # since we do not differentiate based on protocol / port atm for virtual circuits
             for (i, f) in flows.iterrows():
-                if tuple(sorted([f["src"], f["dst"]])) in pairs:
+                if (f["src"], f["dst"]) in pairs or (
+                    (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
+                ):
+                    cost_multiplier = 10 if f["protocol"] == "udp" else 1
                     # TOOD: properly parse Mbps for rate
                     m.add_commodity(
                         f["src"],
                         f["dst"],
-                        float(f["rate"][:-4])
-                        * 3
-                        * ((f["end_time"] - f["start_time"]) / interval_length),
+                        float(f["rate"][:-4]),
+                        cost_multiplier=cost_multiplier
+                        # * ((f["end_time"] - f["start_time"]) / interval_length),
                     )
+
+                    # acks dont need much bw
+                    if f["protocol"] == "tcp":
+                        m.add_commodity(
+                            f["dst"],
+                            f["src"],
+                            0.1,
+                        )
 
             # adding wps
             wps = self._get_waypoints(slas)

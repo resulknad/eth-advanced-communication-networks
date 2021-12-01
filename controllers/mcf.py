@@ -11,29 +11,32 @@ class MCF:
         self.paths = {}
         self.waypoints = {}
 
-    def add_commodity(self, source, target, demand, allow_dup_commodity=False):
+    def add_commodity(
+        self, source, target, demand, allow_dup_commodity=False, cost_multiplier=1
+    ):
         # flow is independent of order
-        if source < target:
-            source, target = target, source
         if not allow_dup_commodity:
-            for (indx, (s, t, d)) in enumerate(self.commodities):
+            for (indx, (s, t, d, cm)) in enumerate(self.commodities):
                 if (s, t) == (source, target):
                     print(
                         "WARNING: already have commodity for ",
                         s,
                         t,
-                        ". Will add requested demand to it ",
+                        ". Will use max demand ",
                         demand,
                         d + demand,
                     )
-                    self.commodities[indx] = (s, t, d + demand)
+                    self.commodities[indx] = (
+                        s,
+                        t,
+                        max(d, demand),
+                        max(cm, cost_multiplier),
+                    )
                     return
-        self.commodities.append((source, target, demand))
+        self.commodities.append((source, target, demand, cost_multiplier))
         return len(self.commodities) - 1
 
     def add_waypoint(self, source, target, waypoint):
-        if source < target:
-            source, target = target, source
         if (source, target) in self.waypoints:
             print(
                 "WARNING: already have a waypoint for {} --- {} ----> {}. since a call to waypoints makes changes to the commodities"
@@ -61,8 +64,8 @@ class MCF:
                 "ERROR: cannot have multiple commodities for one src target pair. FAILING"
             )
 
-        (s, t, d) = self.commodities[index[0][0]]
-        self.commodities[index[0][0]] = ("", "", 0)
+        (s, t, d, cm) = self.commodities[index[0][0]]
+        self.commodities[index[0][0]] = ("", "", 0, 0)
         assert s == source and t == target
         commodity1 = self.add_commodity(s, waypoint, d, True)
         commodity2 = self.add_commodity(waypoint, t, d, True)
@@ -84,6 +87,7 @@ class MCF:
         cost = {
             edge: {
                 commodity: self.graph.edges_map[edge].delay
+                * self.commodities[int(commodity)][3]
                 for commodity in commodities_str
             }
             for edge in edges_str
@@ -116,26 +120,16 @@ class MCF:
         #          for e in excess_edges_str
         #      ]
         # add capacity constaints
-        # if edge is bidirectional, capacity must hold for both
-        for (n1, n2) in itertools.combinations(nodes_str, 2):
-            e = n1 + "|" + n2
-            reverse_e = n2 + "|" + n1
-
-            terms = []
-            if e in variables:
-                terms += [variables[e][c] for c in commodities_str]
-            if reverse_e in variables:
-                terms += [variables[reverse_e][c] for c in commodities_str]
-
-            if len(terms) > 0:
-                e = e if e in variables else reverse_e
-                capacity = edges_capacity[e]
-                prob += lpSum(terms) <= capacity, "%s_capacity" % e
+        for e in variables:
+            prob += (
+                lpSum([variables[e][c] for c in commodities_str]) <= edges_capacity[e],
+                "%s_capacity" % e,
+            )
 
         # add flow conservation
         # (except for supply / demand nodes)
         for c in range(len(self.commodities)):
-            src, target, demand = self.commodities[c]
+            src, target, demand, cm = self.commodities[c]
             if src == "":
                 continue
             for (name, node) in self.graph.nodes.items():
@@ -178,8 +172,8 @@ class MCF:
         # and now require that either both are satisfied to the same degree
         # or not at all (by requiring that excess is equal)
         for (src, target), (_, c1, c2) in self.waypoints.items():
-            c1_src, c1_target, _ = self.commodities[c1]
-            c2_src, c2_target, _ = self.commodities[c2]
+            c1_src, c1_target, _, _ = self.commodities[c1]
+            c2_src, c2_target, _, _ = self.commodities[c2]
             prob += (
                 excess_variables["{}|{}_commodity{}".format(c1_src, c1_target, c1)]
                 == excess_variables["{}|{}_commodity{}".format(c2_src, c2_target, c2)],
@@ -240,7 +234,7 @@ class MCF:
         all_paths = defaultdict(list)
         # reconstruct paths out of adjencency lists for paths
         for c in range(len(self.commodities)):
-            src, dst, _ = self.commodities[c]
+            src, dst, _, _ = self.commodities[c]
 
             n = src
 
@@ -259,10 +253,7 @@ class MCF:
                 # print("commodity: ", c)
                 assert p[0] == src and p[-1] == dst
 
-            # and reverse paths
-            paths_reversed = [p[::-1] for p in paths]
             all_paths[(src, dst, c)] = paths
-            all_paths[(dst, src, c)] = paths_reversed
 
         self.paths = {}
         # combine waypointed paths
@@ -284,17 +275,11 @@ class MCF:
             # we do not want to use them on their own,
             # only together
             src_wp_paths = all_paths.pop((src, waypoint, commodity1))
-            del all_paths[(waypoint, src, commodity1)]
-
             dst_wp_paths = all_paths.pop((waypoint, target, commodity2))
-            del all_paths[(target, waypoint, commodity2)]
 
             self.paths[(src, target)] = [
                 p1 + p2[1:] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
-
-            # reverse
-            self.paths[(target, src)] = [p[::-1] for p in self.paths[(src, target)]]
 
         # add non-waypointed paths
         for (src, dst, cid), paths in all_paths.items():

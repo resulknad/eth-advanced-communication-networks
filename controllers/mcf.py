@@ -187,7 +187,7 @@ class MCF:
             )
         return prob
 
-    def make_and_solve_lp(self, verbose=False):
+    def make_and_solve_lp(self, verbose=True):
         prob = self.make_lp()
         prob.writeLP("test.lp")
         prob.solve(PULP_CBC_CMD(msg=0))
@@ -280,9 +280,6 @@ class MCF:
                 assert (waypoint, target, commodity2) not in all_paths
                 continue
 
-            for (k, v) in all_paths.items():
-                print(k, v)
-            print(src, target, waypoint)
             # the two parts of the waypoints are removed
             # we do not want to use them on their own,
             # only together

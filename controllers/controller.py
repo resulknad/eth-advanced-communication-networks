@@ -54,9 +54,7 @@ class Controller(object):
 
         # -1 will be value for wildcard
 
-        print(df["sport"])
         df["sport"] = df["sport"].str.replace("*", "-1")
-        print(df["sport"])
         sport = df["sport"].str.split("--", n=1, expand=True)
         df["sport_start"], df["sport_end"] = sport[0].astype("int32"), sport[1].astype(
             "int32"
@@ -147,6 +145,7 @@ class Controller(object):
                         f["src"],
                         f["dst"],
                         float(f["rate"][:-4])
+                        * 3
                         * ((f["end_time"] - f["start_time"]) / interval_length),
                     )
 

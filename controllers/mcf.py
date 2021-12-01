@@ -28,7 +28,7 @@ class MCF:
                 return
         self.commodities.append((source, target, demand))
 
-    def add_waypont(self, source, target, waypoint):
+    def add_waypoint(self, source, target, waypoint):
         pass
 
     def make_lp(self):

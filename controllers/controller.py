@@ -71,10 +71,10 @@ class Controller(object):
         df = df[
             (df["type"] == "wp")
             | (
-                (df["sport_start"] <= 100)
-                & (df["sport_end"] <= 100)
-                & (df["dport_start"] <= 100)
-                & (df["dport_end"] <= 100)
+                (df["sport_start"] <= 275)
+                & (df["sport_end"] <= 275)
+                & (df["dport_start"] <= 275)
+                & (df["dport_end"] <= 275)
             )
         ]
         self.filtered_slas = df

@@ -16,6 +16,7 @@ import time
 
 WARMUP = -1000
 TOTAL_TIME = 60
+NORMALIZE_BW_ACROSS_TIME = True
 
 
 class Controller(object):
@@ -71,10 +72,10 @@ class Controller(object):
         df = df[
             (df["type"] == "wp")
             | (
-                (df["sport_start"] <= 100)
-                & (df["sport_end"] <= 100)
-                & (df["dport_start"] <= 100)
-                & (df["dport_end"] <= 100)
+                (df["sport_start"] <= 1000)
+                & (df["sport_end"] <= 1000)
+                & (df["dport_start"] <= 1000)
+                & (df["dport_end"] <= 1000)
             )
         ]
         self.filtered_slas = df
@@ -148,12 +149,15 @@ class Controller(object):
                     bw_multiplier = 1 if f["protocol"] == "udp" else 1
                     # TOOD: properly parse Mbps for rate
                     bw = float(f["rate"][:-4]) * bw_multiplier
+                    if NORMALIZE_BW_ACROSS_TIME:
+                        bw *= ((f["end_time"] - f["start_time"]) / interval_length)
                     m.add_commodity(
                         f["src"],
                         f["dst"],
                         bw,
-                        cost_multiplier=cost_multiplier
-                        # * ((f["end_time"] - f["start_time"]) / interval_length),
+                        cost_multiplier=cost_multiplier,
+                        add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
+                        # * ,
                     )
 
                     # acks dont need much bw
@@ -162,6 +166,7 @@ class Controller(object):
                             f["dst"],
                             f["src"],
                             bw / 2,
+                            add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
                         )
 
             # adding wps

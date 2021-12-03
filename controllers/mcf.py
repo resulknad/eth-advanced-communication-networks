@@ -12,7 +12,7 @@ class MCF:
         self.waypoints = {}
 
     def add_commodity(
-        self, source, target, demand, allow_dup_commodity=False, cost_multiplier=1
+        self, source, target, demand, allow_dup_commodity=False, cost_multiplier=1, add_on_conflict=False
     ):
         # flow is independent of order
         if not allow_dup_commodity:
@@ -22,15 +22,17 @@ class MCF:
                         "WARNING: already have commodity for ",
                         s,
                         t,
-                        ". Will use max demand ",
-                        demand,
-                        d + demand,
+                        ". Will",
+                        "add" if add_on_conflict else "take max out of",
+                        "the demands",
+                        demand, "and",
+                        d,
                     )
                     self.commodities[indx] = (
                         s,
                         t,
-                        max(d, demand),
-                        max(cm, cost_multiplier),
+                        max(d, demand) if not add_on_conflict else d+demand,
+                        max(cm, cost_multiplier) ,
                     )
                     return
         self.commodities.append((source, target, demand, cost_multiplier))
@@ -183,7 +185,6 @@ class MCF:
 
     def make_and_solve_lp(self, verbose=True):
         prob = self.make_lp()
-        prob.writeLP("test.lp")
         prob.solve(PULP_CBC_CMD(msg=0))
 
         if verbose:

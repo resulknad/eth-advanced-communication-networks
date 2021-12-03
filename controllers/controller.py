@@ -161,7 +161,7 @@ class Controller(object):
                         m.add_commodity(
                             f["dst"],
                             f["src"],
-                            bw / 5,
+                            bw / 2,
                         )
 
             # adding wps

@@ -16,7 +16,7 @@ import time
 
 WARMUP = -1000
 TOTAL_TIME = 60
-NORMALIZE_BW_ACROSS_TIME = True
+NORMALIZE_BW_ACROSS_TIME = False
 
 
 class Controller(object):
@@ -72,10 +72,10 @@ class Controller(object):
         df = df[
             (df["type"] == "wp")
             | (
-                (df["sport_start"] <= 1000)
-                & (df["sport_end"] <= 1000)
-                & (df["dport_start"] <= 1000)
-                & (df["dport_end"] <= 1000)
+                (df["sport_start"] <= 200)
+                & (df["sport_end"] <= 200)
+                & (df["dport_start"] <= 200)
+                & (df["dport_end"] <= 200)
             )
         ]
         self.filtered_slas = df

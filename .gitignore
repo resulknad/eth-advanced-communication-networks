@@ -4,3 +4,4 @@ p4src/switch.json
 __pycache__/
 tmp/
 pyrightconfig.json
+.vscode/

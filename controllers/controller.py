@@ -16,7 +16,15 @@ import time
 
 WARMUP = -1000
 TOTAL_TIME = 60
+
+# parameters
 NORMALIZE_BW_ACROSS_TIME = False
+UDP_COST_MULTIPLIER = 1
+TCP_COST_MULTIPLIER = 1
+UDP_BW_MULTIPLIER = 1
+TCP_BW_MULTIPLIER = 1
+TCP_ACK_BW_MULTIPLIER = 0.5
+
 
 
 class Controller(object):
@@ -52,6 +60,7 @@ class Controller(object):
         return df
 
     def _preprocess_slas(self, slas):
+        # read SLAs
         df = pd.read_csv(slas)
         df = df.rename(columns=lambda x: x.strip())
 
@@ -69,6 +78,7 @@ class Controller(object):
             "int32"
         )
 
+        # select SLAs that should be considered
         df = df[
             (df["type"] == "wp")
             | (
@@ -110,18 +120,21 @@ class Controller(object):
         g = Graph(topology)
 
         df = self._preprocess_base_traffic(base_traffic)
-        # find points in time where either 1. a flow starts or 2. a flow end
-        intervals = list(set(list(df["end_time"]) + list(df["start_time"])))
+
+        # find points in time where either 1. a flow starts or 2. a flow ends
+        # intervals = list(set(list(df["end_time"]) + list(df["start_time"])))
 
         # append scenario end time
-        intervals.append(60)
+        # intervals.append(60)
 
         # sort
-        intervals = sorted(intervals)
+        # intervals = sorted(intervals)
+
+        # for now, we use only one interval
+        intervals = [60]
 
         self.time_path_pairs = collections.deque()
         start_time = 0
-        intervals = [10.0 * i for i in range(6, 7)]
 
         for end_time in intervals:
             flows = df[(df["start_time"] <= end_time) & (df["end_time"] >= start_time)]
@@ -131,9 +144,10 @@ class Controller(object):
                     flows.shape[0], start_time, end_time
                 )
             )
+
             m = MCF(g)
 
-            # for which pairs are we going to establish a virtual circuti?
+            # for which pairs are we going to establish a virtual circuit?
             pairs = {}
             for (i, f) in flows.iterrows():
                 if self._sla_applies(f["src"], f["sport"], f["dst"], f["dport"]):
@@ -145,9 +159,10 @@ class Controller(object):
                 if (f["src"], f["dst"]) in pairs or (
                     (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
                 ):
-                    cost_multiplier = 1 if f["protocol"] == "udp" else 1
-                    bw_multiplier = 1 if f["protocol"] == "udp" else 1
-                    # TOOD: properly parse Mbps for rate
+                    cost_multiplier = UDP_COST_MULTIPLIER if f["protocol"] == "udp" else TCP_COST_MULTIPLIER
+                    bw_multiplier = UDP_BW_MULTIPLIER if f["protocol"] == "udp" else TCP_BW_MULTIPLIER
+
+                    # TODO: properly parse Mbps for rate
                     bw = float(f["rate"][:-4]) * bw_multiplier
                     if NORMALIZE_BW_ACROSS_TIME:
                         bw *= ((f["end_time"] - f["start_time"]) / interval_length)
@@ -160,20 +175,21 @@ class Controller(object):
                         # * ,
                     )
 
-                    # acks dont need much bw
+                    # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
                     if f["protocol"] == "tcp":
                         m.add_commodity(
                             f["dst"],
                             f["src"],
-                            bw / 2,
+                            bw * TCP_ACK_BW_MULTIPLIER,
                             add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
                         )
 
-            # adding wps
+            # add wps
             wps = self._get_waypoints(slas)
             for (src, target, wp) in wps:
                 m.add_waypoint(src, target, wp)
 
+            # solve the LP
             m.make_and_solve_lp()
             m.print_paths_summary()
             self.time_path_pairs.append((start_time, m.get_paths()))
@@ -184,7 +200,6 @@ class Controller(object):
     def init(self):
         """Basic initialization. Connects to switches and resets state."""
         self.connect_to_switches()
-        # self.reset_states()
         [controller.reset_state() for controller in self.controllers.values()]
 
     def connect_to_switches(self):
@@ -242,10 +257,8 @@ class Controller(object):
                         [str(port_num), str(1)],
                         [neighbor_mac, str(port_num)],
                     )
-                    pass
 
         self.ecmp_group_counters = collections.defaultdict(int)
-        # self.install_paths(self.time_path_pairs[4][1])
         previous_circuits = {}
         while True:
             if len(self.time_path_pairs) == 0:
@@ -303,15 +316,17 @@ class Controller(object):
                     "virtual_circuit", [str(src_ip), str(dst_ip)]
                 )
 
+            print(f"done removing circuits at {sw_name}")
+
             for (key, _) in added:
                 (src_host, dst_host) = key
                 paths = all_paths[key]
-                # on the destination switch we want a miss in the virtual_circuit table
-                # in order for ipv4_lpm to apply and generate a hit...
                 if len(paths) == 0:
                     print("WARNING: empty list of paths passed, skipping")
                     continue
 
+                # on the destination switch we want a miss in the virtual_circuit table
+                # in order for ipv4_lpm to apply and generate a hit...
                 if paths[0][-2] == sw_name:
                     continue
 
@@ -322,11 +337,11 @@ class Controller(object):
                 print(src_ip, dst_ip)
                 # install entry in ecmp_FEC_tbl
                 for idx, path in enumerate(paths):
-                    path_wo_host = path[1:-1]
-                    print(path_wo_host)
-                    labels = self.get_mpls_stack(path_wo_host)
+                    path_wo_hosts = path[1:-1]
+                    print(path_wo_hosts)
+                    labels = self.get_mpls_stack(path_wo_hosts)
                     print(labels)
-                    num_hops = len(path_wo_host) - 1
+                    num_hops = len(path_wo_hosts) - 1
                     action_name = f"mpls_ingress_{num_hops}_hop"
                     action_args = list(map(str, labels[::-1]))
 
@@ -346,6 +361,8 @@ class Controller(object):
                     [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
                 )
                 self.ecmp_group_counters[sw_name] += 1
+
+            print(f"done adding circuits at {sw_name}")
 
     def get_mpls_stack(self, path) -> List[int]:
         """

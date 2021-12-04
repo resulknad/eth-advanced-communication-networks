@@ -26,7 +26,6 @@ TCP_BW_MULTIPLIER = 1
 TCP_ACK_BW_MULTIPLIER = 0.5
 
 
-
 class Controller(object):
     def __init__(self, base_traffic, slas):
         self.base_traffic_file = base_traffic
@@ -159,13 +158,21 @@ class Controller(object):
                 if (f["src"], f["dst"]) in pairs or (
                     (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
                 ):
-                    cost_multiplier = UDP_COST_MULTIPLIER if f["protocol"] == "udp" else TCP_COST_MULTIPLIER
-                    bw_multiplier = UDP_BW_MULTIPLIER if f["protocol"] == "udp" else TCP_BW_MULTIPLIER
+                    cost_multiplier = (
+                        UDP_COST_MULTIPLIER
+                        if f["protocol"] == "udp"
+                        else TCP_COST_MULTIPLIER
+                    )
+                    bw_multiplier = (
+                        UDP_BW_MULTIPLIER
+                        if f["protocol"] == "udp"
+                        else TCP_BW_MULTIPLIER
+                    )
 
                     # TODO: properly parse Mbps for rate
                     bw = float(f["rate"][:-4]) * bw_multiplier
                     if NORMALIZE_BW_ACROSS_TIME:
-                        bw *= ((f["end_time"] - f["start_time"]) / interval_length)
+                        bw *= (f["end_time"] - f["start_time"]) / interval_length
                     m.add_commodity(
                         f["src"],
                         f["dst"],

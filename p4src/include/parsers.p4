@@ -15,9 +15,15 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             TYPE_IPV4: parse_ipv4;
+            TYPE_HEARTBEAT: parse_heartbeat;
             TYPE_MPLS: parse_mpls;
             default: accept;
         }
+    }
+
+    state parse_heartbeat {
+        packet.extract(hdr.heartbeat);
+        transition accept;
     }
 
     state parse_mpls {
@@ -57,6 +63,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
 
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.heartbeat);
         packet.emit(hdr.mpls);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);

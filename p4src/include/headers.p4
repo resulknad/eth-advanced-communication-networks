@@ -6,11 +6,11 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<16> TYPE_MPLS = 0x8847;
+const bit<16> TYPE_HEARTBEAT = 0x1234;
 const bit<8> PROTOCOL_TCP = 0x6;
 const bit<8> PROTOCOL_UDP = 0x11;
 
-
-#define CONST_MAX_LABELS 8
+#define CONST_MAX_LABELS 11 // LON has 8 base links, plus a maximum of 3 additional links
 #define CONST_MAX_MPLS_HOPS 16
 
 
@@ -77,6 +77,15 @@ header udp_t {
     bit<16> checksum;
 }
 
+header heartbeat_t {
+    bit<9>    port;
+    bit<1>    from_cp;
+    // bit<1>    failed_link;
+    bit<1>    from_switch_to_cpu;
+    bit<1>    link_status;
+    bit<4>    padding;
+}
+
 
 // Instantiate metadata fields
 struct metadata {
@@ -92,11 +101,21 @@ struct metadata {
     bit<13> flowlet_register_index;
     bit<16> flowlet_id;
 
+    // heartbeat
+    bit<1> linkState;
+    bit<1> newLinkState;
+    bit<9> affectedPort;
+    bit<32> nextHop;    // TODO: unused?
+    bit<32> index;      // TODO: unused?
+    bit<48> timestamp;
+
+
 }
 
 // Instantiate packet headers
 struct headers {
     ethernet_t   ethernet;
+    heartbeat_t  heartbeat;
     mpls_t[CONST_MAX_MPLS_HOPS] mpls;
     ipv4_t       ipv4;
     tcp_t        tcp;

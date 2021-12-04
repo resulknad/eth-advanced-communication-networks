@@ -268,6 +268,9 @@ class Controller(object):
         self.ecmp_group_counters = collections.defaultdict(int)
         previous_circuits = {}
         while True:
+            # make sure the log is flushed
+            print("", end="", flush=True)
+
             if len(self.time_path_pairs) == 0:
                 print("WARNING: no more paths to install, nop")
                 time.sleep(10)

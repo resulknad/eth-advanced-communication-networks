@@ -5,8 +5,13 @@
 // Define constants
 
 const bit<16> TYPE_IPV4 = 0x800;
+const bit<16> TYPE_MPLS = 0x8847;
 const bit<8> PROTOCOL_TCP = 0x6;
 const bit<8> PROTOCOL_UDP = 0x11;
+
+
+#define CONST_MAX_LABELS 8
+#define CONST_MAX_MPLS_HOPS 16
 
 
 // Define headers
@@ -14,11 +19,19 @@ const bit<8> PROTOCOL_UDP = 0x11;
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+typedef bit<20> label_t;
 
 header ethernet_t {
     macAddr_t dstAddr;
     macAddr_t srcAddr;
     bit<16>   etherType;
+}
+
+header mpls_t {
+    bit<20>   label;
+    bit<3>    exp;
+    bit<1>    s;
+    bit<8>    ttl;
 }
 
 header ipv4_t {
@@ -67,12 +80,24 @@ header udp_t {
 
 // Instantiate metadata fields
 struct metadata {
+    bit<14> ecmp_hash;
+    bit<14> ecmp_group_id;
+
+    bit<16> srcPort;
+    bit<16> dstPort;
+
+    // flowlet switching
+    bit<48> flowlet_last_stamp;
+    bit<48> flowlet_time_diff;
+    bit<13> flowlet_register_index;
+    bit<16> flowlet_id;
 
 }
 
 // Instantiate packet headers
 struct headers {
     ethernet_t   ethernet;
+    mpls_t[CONST_MAX_MPLS_HOPS] mpls;
     ipv4_t       ipv4;
     tcp_t        tcp;
     udp_t        udp;

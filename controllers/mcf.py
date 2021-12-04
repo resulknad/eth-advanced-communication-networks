@@ -2,19 +2,58 @@ import json
 import pandas as pd
 from collections import defaultdict, deque
 from pulp import *
+from copy import deepcopy
+from collections import namedtuple
+
+FlowEndpoint = namedtuple("FlowEndpoint", ["host", "port", "protocol"])
 
 
 class MCF:
     def __init__(self, graph):
-        self.graph = graph
+        # copy because we will modify graph in here
+        self.graph = deepcopy(graph)
         self.commodities = []
         self.paths = {}
         self.waypoints = {}
 
-    def add_commodity(
-        self, source, target, demand, allow_dup_commodity=False, cost_multiplier=1, add_on_conflict=False
+    def _extend_graph_with_flow_endpoint(self, fe):
+        fe_str = self._flow_endpoint_to_string(fe)
+        self.graph.add_node(fe_str)
+        # add infinite capacity edges from the copies of the node to the actual node
+        self.graph.add_undirected_edge(fe_str, fe.host, delay=0, bw=(2 ** 32))
+        return fe_str
+
+    def add_flow(
+        self,
+        src,
+        dst,
+        demand,
+        allow_dup_commodity=False,
+        cost_multiplier=1,
     ):
-        # flow is independent of order
+        src_node = self._extend_graph_with_flow_endpoint(src)
+        dst_node = self._extend_graph_with_flow_endpoint(dst)
+
+        # now we add the actual commodity
+        commodity_id = self._add_commodity(
+            src_node,
+            dst_node,
+            demand,
+            allow_dup_commodity=allow_dup_commodity,
+            cost_multiplier=cost_multiplier,
+        )
+
+        return (src_node, dst_node, commodity_id)
+
+    def _add_commodity(
+        self,
+        source,
+        target,
+        demand,
+        allow_dup_commodity=False,
+        cost_multiplier=1,
+        add_on_conflict=False,
+    ):
         if not allow_dup_commodity:
             for (indx, (s, t, d, cm)) in enumerate(self.commodities):
                 if (s, t) == (source, target):
@@ -25,21 +64,25 @@ class MCF:
                         ". Will",
                         "add" if add_on_conflict else "take max out of",
                         "the demands",
-                        demand, "and",
+                        demand,
+                        "and",
                         d,
                     )
                     self.commodities[indx] = (
                         s,
                         t,
-                        max(d, demand) if not add_on_conflict else d+demand,
-                        max(cm, cost_multiplier) ,
+                        max(d, demand) if not add_on_conflict else d + demand,
+                        max(cm, cost_multiplier),
                     )
                     return
         self.commodities.append((source, target, demand, cost_multiplier))
         return len(self.commodities) - 1
 
     def add_waypoint(self, source, target, waypoint):
-        if (source, target) in self.waypoints:
+        source_str = self._flow_endpoint_to_string(source)
+        target_str = self._flow_endpoint_to_string(target)
+
+        if (source_str, target_str) in self.waypoints:
             print(
                 "WARNING: already have a waypoint for {} --- {} ----> {}. since a call to waypoints makes changes to the commodities"
                 + ", it is of crucial importance to call add_waypoint after setting up all commodoties and only once. IGNORING".format(
@@ -48,9 +91,14 @@ class MCF:
             )
             return
 
+        waypoint_str = self._extend_graph_with_flow_endpoint(waypoint)
+        if not waypoint_str:
+            print("WARNING: failed to add waypoint node. cannot add waypoint...")
+            return False
+
         index = list(
             filter(
-                lambda tpl: tpl[1][0] == source and tpl[1][1] == target,
+                lambda tpl: tpl[1][0] == source_str and tpl[1][1] == target_str,
                 enumerate(self.commodities),
             )
         )
@@ -68,11 +116,22 @@ class MCF:
 
         (s, t, d, cm) = self.commodities[index[0][0]]
         self.commodities[index[0][0]] = ("", "", 0, 0)
-        assert s == source and t == target
-        commodity1 = self.add_commodity(s, waypoint, d, True, cost_multiplier=cm)
-        commodity2 = self.add_commodity(waypoint, t, d, True, cost_multiplier=cm)
+        assert s == self._flow_endpoint_to_string(
+            source
+        ) and t == self._flow_endpoint_to_string(target)
 
-        self.waypoints[(source, target)] = (waypoint, commodity1, commodity2)
+        commodity1 = self._add_commodity(
+            s, self._flow_endpoint_to_string(waypoint), d, True, cost_multiplier=cm
+        )
+        commodity2 = self._add_commodity(
+            self._flow_endpoint_to_string(waypoint), t, d, True, cost_multiplier=cm
+        )
+
+        self.waypoints[(source_str, target_str)] = (
+            waypoint_str,
+            commodity1,
+            commodity2,
+        )
 
     def make_lp(self):
         prob = LpProblem("Problem", LpMinimize)
@@ -278,22 +337,32 @@ class MCF:
             src_wp_paths = all_paths.pop((src, waypoint, commodity1))
             dst_wp_paths = all_paths.pop((waypoint, target, commodity2))
 
-            self.paths[(src, target)] = [
-                p1 + p2[1:] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
+            self.paths[
+                (self._get_flow_endpoint(src), self._get_flow_endpoint(target))
+            ] = [
+                (p1[:-1] + p2[2:])[1:-1] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
 
         # add non-waypointed paths
         for (src, dst, cid), paths in all_paths.items():
+            self.paths[(self._get_flow_endpoint(src), self._get_flow_endpoint(dst))] = [
+                p[1:-1] for p in paths
+            ]
 
-            self.paths[src, dst] = paths
-        #         if (not src.endswith("_h0") or not dst.endswith("_h0")) and len(paths) > 0:
-        #             print(cid)
-        #             print(self.waypoints)
-        #             print("fail", paths)
-        #             1 / 0
         if verbose:
             print("Paths: ", self.paths)
             print("Total Cost of Transportation = ", value(prob.objective))
+
+    def _get_flow_endpoint(self, name):
+        np = name.split(":")
+        return (
+            FlowEndpoint(name, 0, "")
+            if len(np) == 1
+            else FlowEndpoint(np[0], int(np[1]), np[2])
+        )
+
+    def _flow_endpoint_to_string(self, fe):
+        return "{}:{}:{}".format(fe.host, fe.port, fe.protocol)
 
     def get_paths(self):
         return self.paths

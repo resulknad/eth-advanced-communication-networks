@@ -173,7 +173,7 @@ class Controller(object):
                     bw = float(f["rate"][:-4]) * bw_multiplier
                     if NORMALIZE_BW_ACROSS_TIME:
                         bw *= (f["end_time"] - f["start_time"]) / interval_length
-                    m.add_commodity(
+                    m._add_commodity(
                         f["src"],
                         f["dst"],
                         bw,
@@ -184,7 +184,7 @@ class Controller(object):
 
                     # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
                     if f["protocol"] == "tcp":
-                        m.add_commodity(
+                        m._add_commodity(
                             f["dst"],
                             f["src"],
                             bw * TCP_ACK_BW_MULTIPLIER,

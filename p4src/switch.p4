@@ -12,7 +12,7 @@
 #define ID_WIDTH 16
 #define FLOWLET_TIMEOUT 48w200000
 
-#define THRESHOLD 48w1000000 // 1s # WARNING set bigger than heartbeat frequency.
+#define FAILURE_THRESHOLD 48w1000000 // 1s # WARNING: must be bigger than heartbeat frequency.
 
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
@@ -33,11 +33,10 @@ control MyIngress(inout headers hdr,
     register<bit<ID_WIDTH>>(REGISTER_SIZE) flowlet_to_id;
     register<bit<TIMESTAMP_WIDTH>>(REGISTER_SIZE) flowlet_time_stamp;
 
-    // Register to look up the timestamp of the latest heartbeat received
-    // from that specific port.
+    // stores timestamp of latest heartbeat received on that port
     register<bit<48>>(CONST_MAX_LABELS) tstamp_ports;
 
-    // Register containing link states. 0: No Problems. 1: Link failure.
+    // stores latest known link state, where 0 indicates "up" and 1 indicates "down"
     register<bit<1>>(CONST_MAX_LABELS) linkState;
 
 
@@ -1159,27 +1158,10 @@ control MyIngress(inout headers hdr,
         size = CONST_MAX_LABELS * 2;
     }
 
-    action read_previous_link_status(){
-        linkState.read(meta.linkState, (bit<32>)standard_metadata.ingress_port);
-    }
-
-    action get_timestamp_for_port(){
-        tstamp_ports.read(meta.timestamp, (bit<32>)hdr.heartbeat.port);
-    }
-
-    action set_timestamp_for_port(){
-        tstamp_ports.write((bit<32>)standard_metadata.ingress_port, standard_metadata.ingress_global_timestamp);
-    }
-
     action send_heartbeat(){
         // we make sure the other switch treats the packet as probe from the other side
         hdr.heartbeat.from_cp = 0;
         standard_metadata.egress_spec = hdr.heartbeat.port;
-    }
-
-    action update_linkState(in bit<32> port, in bit link_status){
-        // Update the linkState such that the data plane knows the link is dead.
-        linkState.write(port, link_status);
     }
 
     action get_tcp_ports() {
@@ -1195,44 +1177,51 @@ control MyIngress(inout headers hdr,
     apply {
 
         // handle heartbeat messages
-        if (hdr.heartbeat.isValid()){
+        if (hdr.heartbeat.isValid()) {
 
-            // Control plane sent the packet, there is one for each port.
-            if (hdr.heartbeat.from_cp == 1){
-                // Heartbeat packet contains the port number. We check the
-                // the timestamp for that port.
-                get_timestamp_for_port();
+            if (hdr.heartbeat.from_cp == 1) {
+                // heartbeat was received from the controller
 
-                // read previous link status
-                linkState.read(meta.linkState, (bit<32>)hdr.heartbeat.port);
+                // read timestamp of last received heartbeat on that port
+                tstamp_ports.read(meta.timestamp, (bit<32>) hdr.heartbeat.port);
 
-                // If it has been at least THRESHOLD since the last received
-                // heartbeat, set the linkState to down.
-                if (meta.timestamp != 0 && (standard_metadata.ingress_global_timestamp - meta.timestamp > THRESHOLD) && meta.linkState == 0){
-                    update_linkState((bit<32>)hdr.heartbeat.port, 1);
+                // check if last timestamp is more than FAILURE_THRESHOLD ago and we haven't detected this failure before
+                linkState.read(meta.linkState, (bit<32>) hdr.heartbeat.port);
+                if (meta.timestamp != 0 && (standard_metadata.ingress_global_timestamp - meta.timestamp > FAILURE_THRESHOLD)
+                    && meta.linkState == 0) {
+
+                    // update link state
+                    linkState.write((bit<32>) hdr.heartbeat.port, 1);
+
+                    // store those header values that need to be set on the cloned packet
                     meta.affectedPort = hdr.heartbeat.port;
-                    meta.newLinkState = 1;
+                    meta.linkState = 1;
 
-                    // clone to controller while still forwarding
+                    // clone to notify the controller of the failure
                     clone3(CloneType.I2E, 100, meta);
                 }
+
+                // still need to send the heartbeat to our neighbor
                 send_heartbeat();
-            }
-            // The heartbeat is received from neighbors. Set the receive time
-            // for the arrival port.
-            else{
-                set_timestamp_for_port();
 
-                // read previous link status
-                linkState.read(meta.linkState, (bit<32>)standard_metadata.ingress_port);
+            } else {
+                // heartbeat was received from a neighbor
 
-                // if we thought this link is down
+                // update timestamp of last received packet on that port
+                tstamp_ports.write((bit<32>) standard_metadata.ingress_port, standard_metadata.ingress_global_timestamp);
+
+                // check if this link has been down until now
+                linkState.read(meta.linkState, (bit<32>) standard_metadata.ingress_port);
                 if (meta.linkState == 1) {
-                    update_linkState((bit<32>)standard_metadata.ingress_port, 0);
-                    meta.affectedPort = standard_metadata.ingress_port;
-                    meta.newLinkState = 0;
 
-                    // clone to controller
+                    // update link state
+                    linkState.write((bit<32>)standard_metadata.ingress_port, 0);
+
+                    // store those header values that need to be set on the cloned packet
+                    meta.affectedPort = standard_metadata.ingress_port;
+                    meta.linkState = 0;
+
+                    // clone to notify the controller of the recovery
                     clone3(CloneType.I2E, 100, meta);
                 }
 
@@ -1305,7 +1294,7 @@ control MyEgress(inout headers hdr,
         if (hdr.heartbeat.isValid() && standard_metadata.instance_type == 1) {
             // set failed link flag for the clone we send to the cp
             hdr.heartbeat.from_switch_to_cpu = 1;
-            hdr.heartbeat.link_status = meta.newLinkState;
+            hdr.heartbeat.link_status = meta.linkState;
             hdr.heartbeat.port = meta.affectedPort;
         }
 

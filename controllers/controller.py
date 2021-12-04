@@ -16,6 +16,8 @@ import collections
 import time
 import threading
 
+TYPE_HEARTBEAT = 0x1234
+
 WARMUP = -1000
 TOTAL_TIME = 60
 
@@ -37,30 +39,10 @@ class Controller(object):
         self.start_time = 0
         self.topo = load_topo("topology.json")
         self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
+
         self.init_mcf(base_traffic, "topology.json", slas)
-        self.init()
-
-        # set of links that failed
-        self.failed_links = set()
-
-        # configure mirroring session to cpu port for failure notifications
-        self.set_mirroring_sessions()
-
-        print("set mirroring sessions", flush=True)
-
-        # Initiate the heartbeat messages
-        self.heartbeat(HEARTBEAT_FREQUENCY)
-
-        print("started heartbeats", flush=True)
-
-        # Sniff the traffic coming from switches
-        t = threading.Thread(target=self.run_cpu_port_loop)
-        t.start()
-        # self.run_cpu_port_loop()
-
-        print("started cpu port loop", flush=True)
-
-
+        self.init_controllers()
+        self.init_heartbeats()
 
     def _preprocess_base_traffic(self, base_traffic):
         # read base traffic
@@ -137,6 +119,28 @@ class Controller(object):
 
         wps = df[df["type"] == "wp"]
         return wps[["src", "dst", "target"]].values.tolist()
+
+    def init_heartbeats(self):
+        """
+        Initiates the heartbeat messages and starts listening for failure/recovery notifications.
+        Must be called AFTER self.init_controllers().
+        """
+
+        self.failed_links = set()
+
+        # configure mirroring session to cpu port for failure notifications
+        self._set_mirroring_sessions()
+        print("set mirroring sessions")
+
+        # initiate the heartbeat messages
+        self._heartbeat(HEARTBEAT_FREQUENCY)
+        print("started sending heartbeats")
+
+        # Sniff the traffic coming from switches
+        t = threading.Thread(target=self._sniff_cpu_ports)
+        t.start()
+        print("started listening for link state notifications")
+
 
     def init_mcf(self, base_traffic, topology, slas):
         self._preprocess_slas(slas)
@@ -230,7 +234,7 @@ class Controller(object):
 
         print("time_path_pairs", self.time_path_pairs)
 
-    def init(self):
+    def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""
         self.connect_to_switches()
         [controller.reset_state() for controller in self.controllers.values()]
@@ -241,75 +245,72 @@ class Controller(object):
             thrift_port = self.topo.get_thrift_port(p4switch)
             self.controllers[p4switch] = SimpleSwitchThriftAPI(thrift_port)
 
-    def set_mirroring_sessions(self):
+    def _set_mirroring_sessions(self):
         for p4switch in self.topo.get_p4switches():
             cpu_port = self.topo.get_cpu_port_index(p4switch)
             self.controllers[p4switch].mirroring_add(100, cpu_port)
 
-    def failure_notification(self, failures):
+    def link_state_changed(self, failures):
         """Called if a link fails or recovers.
 
         Args:
             failures (list(tuple(str, str))): List of failed links.
         """
-        print(f"Got a link state change notification! Failures: {failures}")
+        print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
-    # Initiate the heartbeat messages.
-    def heartbeat(self, frequency):
+    def _heartbeat(self, frequency):
         """Runs heartbeat threads"""
         heartbeat = HeartBeatGenerator(frequency)
         heartbeat.run()
 
     def process_packet(self, pkt):
-        """Processes received packets to detect failure notifications"""
+        """Processes received packets to detect failure and recovery notifications"""
 
         interface = pkt.sniffed_on
         switch_name = interface.split("-")[0]
         packet = Ether(raw(pkt))
+
         # check if it is a heartbeat packet
-        if packet.type == 0x1234:
+        if packet.type == TYPE_HEARTBEAT:
             # parse the heartbeat header
             payload = struct.unpack("!H", packet.payload.load)[0]
             from_switch_to_cpu_flag = (payload & 0x0020) >> 5
 
-            # only if it is a failure notification packet.
+            # only if it is a packet sent from switch to cpu
             if from_switch_to_cpu_flag == 1:
 
                 # get link status flag
                 link_status_flag = (payload & 0x0010) >> 4
 
-                print(f"received packet from switch with payload {hex(payload)}", flush=True)
-
                 # get port
                 port = (payload & 0xff80) >> 7
                 # get other side of the link using port
                 neighbor = self.topo.port_to_node(switch_name, port)
-                # detect the failed link
+                # detect the affected link
                 affected_link = tuple(sorted([switch_name, neighbor]))
 
                 if link_status_flag == 1:
                     # link is down
 
-                    # if it is not a duplicated notification
+                    # ignore duplicated notifications (both switches will notify the controller)
                     if affected_link not in self.failed_links:
-                        print("Notification for link failure {} received.".format(affected_link), flush=True)
+                        print(f"Link failure detected: {affected_link}", flush=True)
                         self.failed_links.add(affected_link)
-                        self.failure_notification(list(self.failed_links))
+                        self.link_state_changed(list(self.failed_links))
 
                 else:
                     # link is up
-                    if affected_link in self.failed_links:
-                        print("Notification for link recovery {} received.".format(affected_link), flush=True)
-                        self.failed_links.remove(affected_link)
-                        self.failure_notification(list(self.failed_links))
 
-    def run_cpu_port_loop(self):
+                    # ignore duplicated notifications (both switches will notify the controller)
+                    if affected_link in self.failed_links:
+                        print(f"Link recovery detected: {affected_link}", flush=True)
+                        self.failed_links.remove(affected_link)
+                        self.link_state_changed(list(self.failed_links))
+
+    def _sniff_cpu_ports(self):
         """Sniffs traffic coming from switches"""
         cpu_interfaces = [str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers]
-        # cpu_interfaces = [str(self.topo.get_cpu_port_intf(sw_name)) for sw_name in self.controllers]
-        print(f"cpu_interfaces: {cpu_interfaces}")
         sniff(iface=cpu_interfaces, prn=self.process_packet)
-
 
     def run(self):
         """Run function"""

@@ -80,7 +80,6 @@ header udp_t {
 header heartbeat_t {
     bit<9>    port;
     bit<1>    from_cp;
-    // bit<1>    failed_link;
     bit<1>    from_switch_to_cpu;
     bit<1>    link_status;
     bit<4>    padding;
@@ -105,8 +104,6 @@ struct metadata {
     bit<1> linkState;
     bit<1> newLinkState;
     bit<9> affectedPort;
-    bit<32> nextHop;    // TODO: unused?
-    bit<32> index;      // TODO: unused?
     bit<48> timestamp;
 
 

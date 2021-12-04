@@ -12,7 +12,7 @@
 #define ID_WIDTH 16
 #define FLOWLET_TIMEOUT 48w200000
 
-#define FAILURE_THRESHOLD 48w1000000 // 1s # WARNING: must be bigger than heartbeat frequency.
+#define FAILURE_THRESHOLD 48w500000 // 0.5s # WARNING: must be bigger than heartbeat frequency.
 
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************

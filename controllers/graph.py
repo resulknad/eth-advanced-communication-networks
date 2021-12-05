@@ -51,7 +51,7 @@ class Graph:
 
     def add_node(self, name, n=None):
         if name in self.nodes:
-            print("WARNING: cannot add duplicate node with name {}".format(name))
+            # print("WARNING: cannot add duplicate node with name {}".format(name))
             return False
         self.nodes[name] = Node(name, n)
         return True

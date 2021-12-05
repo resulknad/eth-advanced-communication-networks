@@ -4,6 +4,7 @@ from collections import defaultdict, deque
 from pulp import *
 from copy import deepcopy
 from collections import namedtuple
+from edge import Edge
 
 FlowEndpoint = namedtuple("FlowEndpoint", ["host", "port", "protocol"])
 
@@ -22,6 +23,18 @@ class MCF:
         # add infinite capacity edges from the copies of the node to the actual node
         self.graph.add_undirected_edge(fe_str, fe.host, delay=0, bw=(2 ** 32))
         return fe_str
+
+    def subtract_paths(self, paths, weights):
+        for path, weight in zip(paths, weights):
+            for (n1, n2) in zip(path, path[1:]):
+                e = self.graph.edges_map[str(Edge(n1, n2, 0, 0))]
+                if e.bw - weight < 0:
+                    print(
+                        "WARNING: path has too large of a weight, cannot subtract it. something does not add up",
+                        e,
+                        weight,
+                    )
+                e.bw = max(0, e.bw - weight)
 
     def add_flow(
         self,
@@ -155,7 +168,8 @@ class MCF:
             commodity1,
             commodity2,
         )
-        print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))
+
+        # print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))
 
     def make_lp(self):
         prob = LpProblem("Problem", LpMinimize)
@@ -266,7 +280,7 @@ class MCF:
             )
         return prob
 
-    def make_and_solve_lp(self, verbose=True):
+    def make_and_solve_lp(self, verbose=False):
         prob = self.make_lp()
         prob.solve(PULP_CBC_CMD(msg=0))
 
@@ -275,6 +289,7 @@ class MCF:
 
         # construct paths out of LP result
         result = [defaultdict(list) for _ in self.commodities]
+        excess = 0
         for v in prob.variables():
             if v.varValue != 0.0:
                 # do not consider excess edges
@@ -288,34 +303,37 @@ class MCF:
                     src, dst = nodes[0], nodes[1]
 
                     # do not use excess edges for actual paths...
-                    result[int(commodity)][src].append(dst)
+                    result[int(commodity)][src].append((dst, v.varValue))
                     if verbose:
                         print("edge from", src, "to", dst, "commodity", commodity)
                 if verbose:
                     print(v.name, "=", v.varValue)
+                if v.name.startswith("Excess_"):
+                    excess += v.varValue
 
         paths = collections.defaultdict(list)
 
         # this is almost dfs, but it will visit some nodes twice
         # if they are shared on a path. graph is assumed to be a DAG
         # which should really be ok if the LP did not go horribly wrong
-        def dfs(adj, path):
+        def dfs(adj, path, weights):
             paths = []
             last_node = path[-1]
 
             # reached node of deg 0, so end of path
             if len(adj[last_node]) == 0:
-                return [path]
+                return [(path, min(weights))]
 
             # as long as we have not reached end, continue
-            for n in adj[last_node]:
+            for n, weight in adj[last_node]:
                 # print("moving from", last_node, " to ", n)
                 # print(adj[last_node])
-                paths.extend(dfs(adj, path + [n]))
+                paths.extend(dfs(adj, path + [n], weights + [weight]))
 
             return paths
 
         all_paths = defaultdict(list)
+        path_weights = defaultdict(list)
         # reconstruct paths out of adjencency lists for paths
         for c in range(len(self.commodities)):
             src, dst, _, _ = self.commodities[c]
@@ -326,20 +344,20 @@ class MCF:
             adj = result[c]
 
             # decompose flow into paths
-            paths = dfs(adj, [src])
-
+            paths = dfs(adj, [src], [2 ** 32])
             # remove length 1 paths
-            paths = list(filter(lambda p: len(p) != 1, paths))
+            paths = list(filter(lambda p: len(p[0]) != 1, paths))
 
-            for p in paths:
-                # print(adj["EIN_h0"])
-                # print(adj["AMS_h0"])
-                # print("commodity: ", c)
-                assert p[0] == src and p[-1] == dst
+            all_paths[(src, dst, c)] = []
+            path_weights[(src, dst, c)] = []
 
-            all_paths[(src, dst, c)] = paths
+            for p, weight in paths:
+                all_paths[(src, dst, c)].append(p)
+                path_weights[(src, dst, c)].append(weight)
 
         self.paths = {}
+        self.paths_weights = {}
+
         # combine waypointed paths
         for (
             (src, target),
@@ -367,15 +385,24 @@ class MCF:
                 (p1[:-1] + p2[2:])[1:-1] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
 
+            self.paths_weights[
+                (self._get_flow_endpoint(src), self._get_flow_endpoint(target))
+            ] = min(
+                path_weights[(src, waypoint, commodity1)],
+                path_weights[(waypoint, target, commodity2)],
+            )
+
         # add non-waypointed paths
         for (src, dst, cid), paths in all_paths.items():
-            self.paths[(self._get_flow_endpoint(src), self._get_flow_endpoint(dst))] = [
-                p[1:-1] for p in paths
-            ]
+            src_dst_tpl = (self._get_flow_endpoint(src), self._get_flow_endpoint(dst))
+            self.paths[src_dst_tpl] = [p[1:-1] for p in paths]
+            self.paths_weights[src_dst_tpl] = path_weights[src_dst_tpl]
 
         if verbose:
             print("Paths: ", self.paths)
             print("Total Cost of Transportation = ", value(prob.objective))
+
+        return excess
 
     def _get_flow_endpoint(self, name):
         np = name.split(":")
@@ -391,7 +418,16 @@ class MCF:
     def get_paths(self):
         return self.paths
 
+    def get_paths_and_weights(self):
+        return (self.paths, self.paths_weights)
+
     def print_paths_summary(self):
         for ((src, dst), paths) in self.paths.items():
-            print("From {} to {} have {} paths".format(src, dst, len(paths)))
+            if src.host == "":
+                continue
+            print(
+                "From {}:{} to {}:{} have {} paths".format(
+                    src.host, src.port, dst.host, dst.port, len(paths)
+                )
+            )
             print(paths)

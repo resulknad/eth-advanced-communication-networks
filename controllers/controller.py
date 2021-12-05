@@ -169,7 +169,7 @@ class Controller(object):
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
-        intervals = [MCF_INTERVAL_SIZE * i for i in range(num_intervals + 1)]
+        intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
         start_time = 0
 
@@ -209,11 +209,17 @@ class Controller(object):
                     if (src_fe, dst_fe) in flows_to_path:
                         # flow was already considered in previous timestep
                         # and we already have a path for it
-                        # TODO: what about the reverse path for TCP flows?
                         m.subtract_paths(
                             flows_to_path[(src_fe, dst_fe)],
                             flows_to_path_weights[(src_fe, dst_fe)],
                         )
+
+                        # for TCP flows, we also keep the reverse path for the ACKs
+                        if f["protocol"] == "tcp":
+                            m.subtract_paths(
+                                flows_to_path[(dst_fe, src_fe)],
+                                flows_to_path_weights[(dst_fe, src_fe)],
+                            )
                     else:
                         # find path for that new flow
                         self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)

@@ -130,6 +130,9 @@ control MyIngress(inout headers hdr,
         key = {
             hdr.ipv4.srcAddr: exact;
             hdr.ipv4.dstAddr: exact;
+            meta.srcPort: exact;
+            meta.dstPort: exact;
+            hdr.ipv4.protocol: exact;
         }
         actions = {
             ecmp_group;

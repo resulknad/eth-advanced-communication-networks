@@ -30,6 +30,9 @@ TCP_ACK_BW_MULTIPLIER = 0.5
 TCP_END_TIME_MULTIPLIER = 1.5
 FILTER_SLA_MAX_PORT = 200
 
+# this basically means include UDP flows from 200-300
+FILTER_INCLUDE_SLA_BY_NAME = ["prr_28"]
+
 
 class Controller(object):
     def __init__(self, base_traffic, slas):
@@ -84,13 +87,16 @@ class Controller(object):
 
         # select SLAs that should be considered
         df = df[
-            (df["type"] != "wp")
-            & (
-                (df["sport_start"] <= FILTER_SLA_MAX_PORT)
-                & (df["sport_end"] <= FILTER_SLA_MAX_PORT)
-                & (df["dport_start"] <= FILTER_SLA_MAX_PORT)
-                & (df["dport_end"] <= FILTER_SLA_MAX_PORT)
+            (
+                (df["type"] != "wp")
+                & (
+                    (df["sport_start"] <= FILTER_SLA_MAX_PORT)
+                    & (df["sport_end"] <= FILTER_SLA_MAX_PORT)
+                    & (df["dport_start"] <= FILTER_SLA_MAX_PORT)
+                    & (df["dport_end"] <= FILTER_SLA_MAX_PORT)
+                )
             )
+            | df["id"].isin(FILTER_INCLUDE_SLA_BY_NAME)
         ]
         self.filtered_slas = df
 

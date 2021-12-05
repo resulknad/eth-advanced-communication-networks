@@ -192,20 +192,18 @@ class Controller(object):
         self._preprocess_slas(slas)
 
         # read topology
-        g = Graph(topology)
+        self.g = Graph(topology)
 
         df = self._preprocess_base_traffic(base_traffic)
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
-        intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
+        self.intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
+        # compute and store flows for each interval
+        self.flows_for_interval = {}
         start_time = 0
-
-        flows_to_path = defaultdict(list)
-        flows_to_path_weights = defaultdict(list)
-
-        for end_time in intervals:
+        for end_time in self.intervals:
             flows = df[
                 (df["start_time"] <= end_time)
                 & (
@@ -216,12 +214,29 @@ class Controller(object):
                     )
                 )
             ]
+
+            self.flows_for_interval[end_time] = flows
+
             print(
                 "Have {} flows from {} to {}".format(
                     flows.shape[0], start_time, end_time
                 )
             )
-            m = MCF(g)
+
+            start_time = end_time
+
+        self._compute_paths_mcf()
+
+    def _compute_paths_mcf(self):
+
+        start_time = 0
+
+        flows_to_path = defaultdict(list)
+        flows_to_path_weights = defaultdict(list)
+
+        for end_time in self.intervals:
+            flows = self.flows_for_interval[end_time]
+            m = MCF(self.g)
             interval_length = end_time - start_time
 
             for (i, f) in flows.iterrows():
@@ -254,7 +269,7 @@ class Controller(object):
                         self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
 
             # add wps
-            wps = self._get_waypoints(slas)
+            wps = self._get_waypoints(self.slas_file)
             for (src, target, wp, protocol) in wps:
                 m.add_waypoint_to_all(src, target, wp, protocol)
 
@@ -290,6 +305,7 @@ class Controller(object):
             start_time = end_time
 
         self.paths = flows_to_path
+
 
     def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""

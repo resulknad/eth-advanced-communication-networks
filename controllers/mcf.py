@@ -30,6 +30,7 @@ class MCF:
         demand,
         allow_dup_commodity=False,
         cost_multiplier=1,
+        add_on_conflict=False,
     ):
         src_node = self._extend_graph_with_flow_endpoint(src)
         dst_node = self._extend_graph_with_flow_endpoint(dst)
@@ -41,6 +42,7 @@ class MCF:
             demand,
             allow_dup_commodity=allow_dup_commodity,
             cost_multiplier=cost_multiplier,
+            add_on_conflict=add_on_conflict,
         )
 
         return (src_node, dst_node, commodity_id)
@@ -78,7 +80,28 @@ class MCF:
         self.commodities.append((source, target, demand, cost_multiplier))
         return len(self.commodities) - 1
 
-    def add_waypoint(self, source, target, waypoint):
+    def add_waypoint_to_all(self, source, target, waypoint, protocol):
+        wp = FlowEndpoint(host=waypoint, port=1, protocol=protocol)
+        wps_to_add = []
+
+        # first we make a list of all flows that match the waypoint
+        # this is done in two steps because waypointing changes the commodities
+        for (indx, (s, t, d, cm)) in enumerate(self.commodities):
+            # parse host:port:protocol
+            s_fe = self._get_flow_endpoint(s)
+            t_fe = self._get_flow_endpoint(t)
+            if (
+                s_fe.host == source
+                and t_fe.host == target
+                and s_fe.protocol == protocol
+            ):
+                wps_to_add.append([s_fe, t_fe, wp])
+
+        # we now waypoint all of those flows
+        for wp in wps_to_add:
+            self.add_waypoint_to_flow(*wp)
+
+    def add_waypoint_to_flow(self, source, target, waypoint):
         source_str = self._flow_endpoint_to_string(source)
         target_str = self._flow_endpoint_to_string(target)
 
@@ -132,6 +155,7 @@ class MCF:
             commodity1,
             commodity2,
         )
+        print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))
 
     def make_lp(self):
         prob = LpProblem("Problem", LpMinimize)

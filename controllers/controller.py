@@ -9,7 +9,7 @@ from itertools import product
 from pulp.apis import cplex_api
 
 from graph import Graph
-from mcf import MCF
+from mcf import MCF, FlowEndpoint
 import pandas as pd
 import collections
 import time
@@ -18,12 +18,13 @@ WARMUP = -1000
 TOTAL_TIME = 60
 
 # parameters
-NORMALIZE_BW_ACROSS_TIME = False
+NORMALIZE_BW_ACROSS_TIME = True
 UDP_COST_MULTIPLIER = 1
 TCP_COST_MULTIPLIER = 1
 UDP_BW_MULTIPLIER = 1
 TCP_BW_MULTIPLIER = 1
 TCP_ACK_BW_MULTIPLIER = 0.5
+FILTER_SLA_MAX_PORT = 1000
 
 
 class Controller(object):
@@ -79,17 +80,17 @@ class Controller(object):
 
         # select SLAs that should be considered
         df = df[
-            (df["type"] == "wp")
-            | (
-                (df["sport_start"] <= 200)
-                & (df["sport_end"] <= 200)
-                & (df["dport_start"] <= 200)
-                & (df["dport_end"] <= 200)
+            (df["type"] != "wp")
+            & (
+                (df["sport_start"] <= FILTER_SLA_MAX_PORT)
+                & (df["sport_end"] <= FILTER_SLA_MAX_PORT)
+                & (df["dport_start"] <= FILTER_SLA_MAX_PORT)
+                & (df["dport_end"] <= FILTER_SLA_MAX_PORT)
             )
         ]
         self.filtered_slas = df
 
-    def _sla_applies(self, from_host, from_port, to_host, to_port):
+    def _sla_applies(self, from_host, from_port, to_host, to_port, protocol):
         relevant_slas = []
         for (indx, sla) in self.filtered_slas.iterrows():
             src_match = sla.src == "*" or sla.src == from_host
@@ -101,7 +102,13 @@ class Controller(object):
                 sla.dport_end == -1 or sla.dport_end >= to_port
             )
 
-            if src_match and src_port_match and dst_match and dst_port_match:
+            if (
+                src_match
+                and src_port_match
+                and dst_match
+                and dst_port_match
+                and sla.protocol == protocol
+            ):
                 relevant_slas.append(sla)
         return relevant_slas
 
@@ -110,7 +117,8 @@ class Controller(object):
         df = df.rename(columns=lambda x: x.strip())
 
         wps = df[df["type"] == "wp"]
-        return wps[["src", "dst", "target"]].values.tolist()
+
+        return wps[["src", "dst", "target", "protocol"]].values.tolist()
 
     def init_mcf(self, base_traffic, topology, slas):
         self._preprocess_slas(slas)
@@ -146,18 +154,19 @@ class Controller(object):
 
             m = MCF(g)
 
-            # for which pairs are we going to establish a virtual circuit?
-            pairs = {}
-            for (i, f) in flows.iterrows():
-                if self._sla_applies(f["src"], f["sport"], f["dst"], f["dport"]):
-                    pairs[(f["src"], f["dst"])] = True
-
             # make sure to consider all of the flows inbetween the two endpoints
             # since we do not differentiate based on protocol / port atm for virtual circuits
             for (i, f) in flows.iterrows():
-                if (f["src"], f["dst"]) in pairs or (
-                    (f["dst"], f["src"]) in pairs and f["protocol"] == "tcp"
+                if self._sla_applies(
+                    f["src"], f["sport"], f["dst"], f["dport"], f["protocol"]
                 ):
+                    src_fe = FlowEndpoint(
+                        host=f["src"], port=f["sport"], protocol=f["protocol"]
+                    )
+                    dst_fe = FlowEndpoint(
+                        host=f["dst"], port=f["dport"], protocol=f["protocol"]
+                    )
+
                     cost_multiplier = (
                         UDP_COST_MULTIPLIER
                         if f["protocol"] == "udp"
@@ -173,9 +182,10 @@ class Controller(object):
                     bw = float(f["rate"][:-4]) * bw_multiplier
                     if NORMALIZE_BW_ACROSS_TIME:
                         bw *= (f["end_time"] - f["start_time"]) / interval_length
-                    m._add_commodity(
-                        f["src"],
-                        f["dst"],
+
+                    m.add_flow(
+                        src_fe,
+                        dst_fe,
                         bw,
                         cost_multiplier=cost_multiplier,
                         add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
@@ -184,17 +194,17 @@ class Controller(object):
 
                     # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
                     if f["protocol"] == "tcp":
-                        m._add_commodity(
-                            f["dst"],
-                            f["src"],
+                        m.add_flow(
+                            dst_fe,
+                            src_fe,
                             bw * TCP_ACK_BW_MULTIPLIER,
                             add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
                         )
 
             # add wps
             wps = self._get_waypoints(slas)
-            for (src, target, wp) in wps:
-                m.add_waypoint(src, target, wp)
+            for (src, target, wp, protocol) in wps:
+                m.add_waypoint_to_all(src, target, wp, protocol)
 
             # solve the LP
             m.make_and_solve_lp()
@@ -303,13 +313,13 @@ class Controller(object):
         same = set_all_paths & set_previous_paths
         added = set_all_paths - set_previous_paths
         removed = set_previous_paths - set_all_paths
-
+        print(added)
         print("same", len(same))
         print("added", len(added))
         print("removed", len(removed))
         for (sw_name, controller) in self.controllers.items():
             for (key, _) in removed:
-                (src_host, dst_host) = key
+                (src_fe, dst_fe) = key
                 paths = previous_paths[key]
 
                 if len(paths) == 0:
@@ -319,17 +329,24 @@ class Controller(object):
                 if paths[0][-2] == sw_name:
                     continue
 
-                src_ip = self.topo.get_host_ip(src_host)  # + '/32'
-                dst_ip = self.topo.get_host_ip(dst_host)  # + '/32'
+                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
+                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
 
                 self.controllers[sw_name].table_delete_match(
-                    "virtual_circuit", [str(src_ip), str(dst_ip)]
+                    "virtual_circuit",
+                    [
+                        str(src_ip),
+                        str(dst_ip),
+                        str(src_fe.port),
+                        str(dst_fe.port),
+                        str(6 if src_fe.protocol == "tcp" else 17),
+                    ],
                 )
 
             print(f"done removing circuits at {sw_name}")
 
             for (key, _) in added:
-                (src_host, dst_host) = key
+                (src_fe, dst_fe) = key
                 paths = all_paths[key]
                 if len(paths) == 0:
                     print("WARNING: empty list of paths passed, skipping")
@@ -340,15 +357,14 @@ class Controller(object):
                 if paths[0][-2] == sw_name:
                     continue
 
-                # TODO: install reverse p[ath]
-                src_ip = self.topo.get_host_ip(src_host)  # + '/32'
-                dst_ip = self.topo.get_host_ip(dst_host)  # + '/32'
+                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
+                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
 
                 print(src_ip, dst_ip)
                 # install entry in ecmp_FEC_tbl
                 for idx, path in enumerate(paths):
                     path_wo_hosts = path[1:-1]
-                    print(path_wo_hosts)
+                    print(path, path_wo_hosts)
                     labels = self.get_mpls_stack(path_wo_hosts)
                     print(labels)
                     num_hops = len(path_wo_hosts) - 1
@@ -367,7 +383,13 @@ class Controller(object):
                 self.controllers[sw_name].table_add(
                     "virtual_circuit",
                     "ecmp_group",
-                    [str(src_ip), str(dst_ip)],
+                    [
+                        str(src_ip),
+                        str(dst_ip),
+                        str(src_fe.port),
+                        str(dst_fe.port),
+                        str(6 if src_fe.protocol == "tcp" else 17),
+                    ],
                     [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
                 )
                 self.ecmp_group_counters[sw_name] += 1

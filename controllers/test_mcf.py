@@ -79,7 +79,7 @@ class MCFTestCase(unittest.TestCase):
         # now we add the waypoint and the path should contain MAN
         mcf = MCF(self.graph)
         mcf.add_flow(LIS, BER, 5)
-        mcf.add_waypoint(LIS, BER, MAN)
+        mcf.add_waypoint_to_flow(LIS, BER, MAN)
         mcf.make_and_solve_lp()
         paths = mcf.get_paths()
 
@@ -102,7 +102,7 @@ class MCFTestCase(unittest.TestCase):
         mcf.add_flow(LIS, BER, 10, cost_multiplier=100)
         mcf.add_flow(LIS_2, LON_2, 10)
 
-        mcf.add_waypoint(LIS, BER, LON)
+        mcf.add_waypoint_to_flow(LIS, BER, LON)
 
         mcf.make_and_solve_lp()
         paths = mcf.get_paths()

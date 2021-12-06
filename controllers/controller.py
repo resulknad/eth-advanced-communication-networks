@@ -4,7 +4,6 @@ from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from typing import Dict, List
 
-from itertools import product
 from collections import defaultdict
 
 from heartbeat_generator import HeartBeatGenerator
@@ -14,9 +13,9 @@ from graph import Graph
 from mcf import MCF, FlowEndpoint
 import pandas as pd
 import collections
-import time
 import threading
 import math
+import time
 
 TYPE_HEARTBEAT = 0x1234
 
@@ -46,6 +45,7 @@ class Controller(object):
         self.slas_file = slas
         self.topo = load_topo("topology.json")
         self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
+        self.ecmp_group_counters = collections.defaultdict(int)
 
         self.init_mcf(base_traffic, "topology.json", slas)
         self.init_controllers()
@@ -227,7 +227,7 @@ class Controller(object):
 
         self._compute_paths_mcf()
 
-    def _compute_paths_mcf(self):
+    def _compute_paths_mcf(self, failures=[]):
 
         start_time = 0
 
@@ -237,6 +237,11 @@ class Controller(object):
         for end_time in self.intervals:
             flows = self.flows_for_interval[end_time]
             m = MCF(self.g)
+
+            # remove failed links
+            for n1, n2 in failures:
+                m.remove_failed_link(n1, n2)
+
             interval_length = end_time - start_time
 
             for (i, f) in flows.iterrows():
@@ -331,12 +336,21 @@ class Controller(object):
         """
         print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
+        print("Recomputing MCF solution")
+        previous_paths = self.paths
+        self._compute_paths_mcf(failures)
+
+        print("Installing new paths")
+        # install new paths
+        self.install_paths(self.paths, previous_paths)
+        print("Done installing new paths")
+
     def _heartbeat(self, frequency):
         """Runs heartbeat threads"""
         heartbeat = HeartBeatGenerator(frequency)
         heartbeat.run()
 
-    def process_packet(self, pkt):
+    def _process_packet(self, pkt):
         """Processes received packets to detect failure and recovery notifications"""
 
         interface = pkt.sniffed_on
@@ -383,11 +397,14 @@ class Controller(object):
     def _sniff_cpu_ports(self):
         """Sniffs traffic coming from switches"""
         cpu_interfaces = [str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers]
-        sniff(iface=cpu_interfaces, prn=self.process_packet)
+        sniff(iface=cpu_interfaces, prn=self._process_packet)
 
     def run(self):
         """Run function"""
+        self.install_base_table_entries()
+        self.install_paths(self.paths)
 
+    def install_base_table_entries(self):
         for sw_name in self.topo.get_p4switches():
 
             # install table entry for the directly connected hosts
@@ -430,18 +447,57 @@ class Controller(object):
                     [neighbor_mac, str(port_num)],
                 )
 
-        self.install_paths(self.paths)
+    def install_paths(self, all_paths, previous_paths={}):
+        st = time.time()
 
-    def install_paths(self, all_paths):
-        self.ecmp_group_counters = collections.defaultdict(int)
+        # print(f"all paths: {all_paths}")
+
+        to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))
+        set_all_paths = to_set(all_paths)
+        set_previous_paths = to_set(previous_paths)
+
+        same = set_all_paths & set_previous_paths
+        added = set_all_paths - set_previous_paths
+        removed = set_previous_paths - set_all_paths
+
+        # print(f"same paths ({len(same)}): {same}")
+        # print(f"added paths ({len(added)}): {added}")
+        # print(f"removed paths ({len(removed)}): {removed}", flush=True)
 
         for (sw_name, controller) in self.controllers.items():
 
+            for (key, _) in removed:
+                (src_fe, dst_fe) = key
+                paths = previous_paths[key]
+
+                if len(paths) == 0:
+                    print("WARNING: empty list of paths passed, skipping")
+                    continue
+
+                if paths[0][-2] == sw_name:
+                    continue
+
+                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
+                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
+
+                self.controllers[sw_name].table_delete_match(
+                    "virtual_circuit",
+                    [
+                        str(src_ip),
+                        str(dst_ip),
+                        str(src_fe.port),
+                        str(dst_fe.port),
+                        str(6 if src_fe.protocol == "tcp" else 17),
+                    ]
+                )
+
             print(f"done removing circuits at {sw_name}")
 
-            for key in all_paths:
+
+            for (key, _) in added:
                 (src_fe, dst_fe) = key
                 paths = all_paths[key]
+
                 if len(paths) == 0:
                     print("WARNING: empty list of paths passed, skipping")
                     continue
@@ -455,7 +511,7 @@ class Controller(object):
                 dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
 
                 print(src_ip, dst_ip)
-                # install entry in ecmp_FEC_tbl
+                # install entry in virtual_circuit_path table
                 for idx, path in enumerate(paths):
                     path_wo_hosts = path[1:-1]
                     print(path, path_wo_hosts)
@@ -474,6 +530,7 @@ class Controller(object):
                         action_args,
                     )
 
+                # install entry in virtual_circuit table
                 self.controllers[sw_name].table_add(
                     "virtual_circuit",
                     "ecmp_group",
@@ -489,6 +546,10 @@ class Controller(object):
                 self.ecmp_group_counters[sw_name] += 1
 
             print(f"done adding circuits at {sw_name}")
+
+        et = time.time()
+        print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")
+        print(f"Installing paths took {et - st}", flush=True)
 
     def get_mpls_stack(self, path) -> List[int]:
         """

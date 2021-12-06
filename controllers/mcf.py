@@ -36,6 +36,14 @@ class MCF:
                     )
                 e.bw = max(0, e.bw - weight)
 
+    def remove_failed_link(self, n1, n2):
+        e = self.graph.edges_map[str(Edge(n1, n2, 0, 0))]
+        e.bw = 0
+
+        # same for other direction
+        e = self.graph.edges_map[str(Edge(n2, n1, 0, 0))]
+        e.bw = 0
+
     def add_flow(
         self,
         src,

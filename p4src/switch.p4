@@ -154,7 +154,6 @@ control MyIngress(inout headers hdr,
         }
         actions = {
             set_nhop;
-            ecmp_group;
             drop;
         }
         default_action = drop;
@@ -1061,34 +1060,6 @@ control MyIngress(inout headers hdr,
      * This table maps the selected path (identified by the ecmp_group_id and ecmp_hash) to the actual
      * path in the form of a label stack.
      */
-    table ecmp_FEC_tbl {
-        key = {
-            meta.ecmp_group_id: exact;
-            meta.ecmp_hash: exact;
-        }
-        actions = {
-            mpls_ingress_1_hop;
-            mpls_ingress_2_hop;
-            mpls_ingress_3_hop;
-            mpls_ingress_4_hop;
-            mpls_ingress_5_hop;
-            mpls_ingress_6_hop;
-            mpls_ingress_7_hop;
-            mpls_ingress_8_hop;
-            mpls_ingress_9_hop;
-            mpls_ingress_10_hop;
-            mpls_ingress_11_hop;
-            mpls_ingress_12_hop;
-            mpls_ingress_13_hop;
-            mpls_ingress_14_hop;
-            mpls_ingress_15_hop;
-            mpls_ingress_16_hop;
-            drop;
-        }
-        default_action = drop;
-        size = 256;
-    }
-
     table virtual_circuit_path {
         key = {
             meta.ecmp_group_id: exact;
@@ -1262,19 +1233,11 @@ control MyIngress(inout headers hdr,
                 get_random_flowlet_id();
             }
 
-            switch (virtual_circuit.apply().action_run) {
-                ecmp_group: {
-                    virtual_circuit_path.apply();
-                }
-                no_action: {
-                    switch (ipv4_lpm.apply().action_run) {
-                        ecmp_group: {
-                            ecmp_FEC_tbl.apply();
-                        }
-                    }
-                }
+            if (virtual_circuit.apply().hit) {
+                virtual_circuit_path.apply();
+            } else {
+                ipv4_lpm.apply();
             }
-
 
         }
 

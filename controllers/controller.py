@@ -460,10 +460,6 @@ class Controller(object):
         added = set_all_paths - set_previous_paths
         removed = set_previous_paths - set_all_paths
 
-        # print(f"same paths ({len(same)}): {same}")
-        # print(f"added paths ({len(added)}): {added}")
-        # print(f"removed paths ({len(removed)}): {removed}", flush=True)
-
         for (sw_name, controller) in self.controllers.items():
 
             for (key, _) in removed:
@@ -477,9 +473,11 @@ class Controller(object):
                 if paths[0][-2] == sw_name:
                     continue
 
-                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
-                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
+                src_ip = self.topo.get_host_ip(src_fe.host)
+                dst_ip = self.topo.get_host_ip(dst_fe.host)
 
+                # TODO: We do not remove the paths from table virtual_circuit_paths.
+                # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
                 self.controllers[sw_name].table_delete_match(
                     "virtual_circuit",
                     [
@@ -507,8 +505,8 @@ class Controller(object):
                 if paths[0][-2] == sw_name:
                     continue
 
-                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
-                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
+                src_ip = self.topo.get_host_ip(src_fe.host)
+                dst_ip = self.topo.get_host_ip(dst_fe.host)
 
                 print(src_ip, dst_ip)
                 # install entry in virtual_circuit_path table

@@ -49,6 +49,36 @@ class Graph:
         self.edges_map[str(e)] = e
         return True
 
+    def get_edge(self, n1, n2):
+        edge_str = str(Edge(n1, n2, 0, 0))
+        return self.edges_map.get(edge_str, None)
+
+    def set_edge_bw(self, n1, n2, bw):
+        e = self.get_edge(n1, n2)
+        if e is None:
+            print("WARNING: cannot set edge bw because edge does not exist", n1, n2)
+            return False
+
+        e.bw = bw
+        return True
+
+    def subtract_path(self, path, weight):
+        for (n1, n2) in zip(path, path[1:]):
+            e = self.get_edge(n1, n2)
+            if e is None:
+                print(
+                    "WARNIING: cannot subtract path because edge does not exist", n1, n2
+                )
+                return False
+            if e.bw - weight < 0:
+                print(
+                    "WARNING: path has too large of a weight, cannot subtract it. something does not add up",
+                    e,
+                    weight,
+                )
+            e.bw = max(0, e.bw - weight)
+        return True
+
     def add_node(self, name, n=None):
         if name in self.nodes:
             # print("WARNING: cannot add duplicate node with name {}".format(name))

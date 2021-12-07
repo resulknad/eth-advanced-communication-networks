@@ -10,7 +10,8 @@ from heartbeat_generator import HeartBeatGenerator
 from scapy.all import *
 
 from graph import Graph
-from mcf import MCF, FlowEndpoint
+from mcf import MCF
+from flow_endpoint import FlowEndpoint
 import pandas as pd
 import collections
 import threading

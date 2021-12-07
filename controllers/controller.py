@@ -4,17 +4,20 @@ from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from typing import Dict, List
 
-from itertools import product
 from collections import defaultdict
 
-from pulp.apis import cplex_api
+from heartbeat_generator import HeartBeatGenerator
+from scapy.all import *
 
 from graph import Graph
 from mcf import MCF, FlowEndpoint
 import pandas as pd
 import collections
-import time
+import threading
 import math
+import time
+
+TYPE_HEARTBEAT = 0x1234
 
 TOTAL_TIME = 60 # seconds
 
@@ -26,6 +29,7 @@ TCP_COST_MULTIPLIER = 1
 UDP_BW_MULTIPLIER = 1
 TCP_BW_MULTIPLIER = 1
 TCP_ACK_BW_MULTIPLIER = 0.5
+HEARTBEAT_FREQUENCY = 0.1
 
 # tcp flows rarely finish on time, so we can consider that for our model
 TCP_END_TIME_MULTIPLIER = 1.5
@@ -41,8 +45,11 @@ class Controller(object):
         self.slas_file = slas
         self.topo = load_topo("topology.json")
         self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
+        self.ecmp_group_counters = collections.defaultdict(int)
+
         self.init_mcf(base_traffic, "topology.json", slas)
-        self.init()
+        self.init_controllers()
+        self.init_heartbeats()
 
     def _preprocess_base_traffic(self, base_traffic):
         # read base traffic
@@ -159,24 +166,44 @@ class Controller(object):
                 add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
             )
 
+    def init_heartbeats(self):
+        """
+        Initiates the heartbeat messages and starts listening for failure/recovery notifications.
+        Must be called AFTER self.init_controllers().
+        """
+
+        self.failed_links = set()
+
+        # configure mirroring session to cpu port for failure notifications
+        self._set_mirroring_sessions()
+        print("set mirroring sessions")
+
+        # initiate the heartbeat messages
+        self._heartbeat(HEARTBEAT_FREQUENCY)
+        print("started sending heartbeats")
+
+        # Sniff the traffic coming from switches
+        t = threading.Thread(target=self._sniff_cpu_ports)
+        t.start()
+        print("started listening for link state notifications")
+
+
     def init_mcf(self, base_traffic, topology, slas):
         self._preprocess_slas(slas)
 
         # read topology
-        g = Graph(topology)
+        self.g = Graph(topology)
 
         df = self._preprocess_base_traffic(base_traffic)
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
-        intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
+        self.intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
+        # compute and store flows for each interval
+        self.flows_for_interval = {}
         start_time = 0
-
-        flows_to_path = defaultdict(list)
-        flows_to_path_weights = defaultdict(list)
-
-        for end_time in intervals:
+        for end_time in self.intervals:
             flows = df[
                 (df["start_time"] <= end_time)
                 & (
@@ -187,12 +214,34 @@ class Controller(object):
                     )
                 )
             ]
+
+            self.flows_for_interval[end_time] = flows
+
             print(
                 "Have {} flows from {} to {}".format(
                     flows.shape[0], start_time, end_time
                 )
             )
-            m = MCF(g)
+
+            start_time = end_time
+
+        self._compute_paths_mcf()
+
+    def _compute_paths_mcf(self, failures=[]):
+
+        start_time = 0
+
+        flows_to_path = defaultdict(list)
+        flows_to_path_weights = defaultdict(list)
+
+        for end_time in self.intervals:
+            flows = self.flows_for_interval[end_time]
+            m = MCF(self.g)
+
+            # remove failed links
+            for n1, n2 in failures:
+                m.remove_failed_link(n1, n2)
+
             interval_length = end_time - start_time
 
             for (i, f) in flows.iterrows():
@@ -225,7 +274,7 @@ class Controller(object):
                         self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
 
             # add wps
-            wps = self._get_waypoints(slas)
+            wps = self._get_waypoints(self.slas_file)
             for (src, target, wp, protocol) in wps:
                 m.add_waypoint_to_all(src, target, wp, protocol)
 
@@ -262,7 +311,8 @@ class Controller(object):
 
         self.paths = flows_to_path
 
-    def init(self):
+
+    def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""
         self.connect_to_switches()
         [controller.reset_state() for controller in self.controllers.values()]
@@ -273,9 +323,88 @@ class Controller(object):
             thrift_port = self.topo.get_thrift_port(p4switch)
             self.controllers[p4switch] = SimpleSwitchThriftAPI(thrift_port)
 
+    def _set_mirroring_sessions(self):
+        for p4switch in self.topo.get_p4switches():
+            cpu_port = self.topo.get_cpu_port_index(p4switch)
+            self.controllers[p4switch].mirroring_add(100, cpu_port)
+
+    def link_state_changed(self, failures):
+        """Called if a link fails or recovers.
+
+        Args:
+            failures (list(tuple(str, str))): List of failed links.
+        """
+        print(f"Got a link state change notification! Failures: {failures}", flush=True)
+
+        print("Recomputing MCF solution")
+        previous_paths = self.paths
+        self._compute_paths_mcf(failures)
+
+        print("Installing new paths")
+        # install new paths
+        self.install_paths(self.paths, previous_paths)
+        print("Done installing new paths")
+
+    def _heartbeat(self, frequency):
+        """Runs heartbeat threads"""
+        heartbeat = HeartBeatGenerator(frequency)
+        heartbeat.run()
+
+    def _process_packet(self, pkt):
+        """Processes received packets to detect failure and recovery notifications"""
+
+        interface = pkt.sniffed_on
+        switch_name = interface.split("-")[0]
+        packet = Ether(raw(pkt))
+
+        # check if it is a heartbeat packet
+        if packet.type == TYPE_HEARTBEAT:
+            # parse the heartbeat header
+            payload = struct.unpack("!H", packet.payload.load)[0]
+            from_switch_to_cpu_flag = (payload & 0x0020) >> 5
+
+            # only if it is a packet sent from switch to cpu
+            if from_switch_to_cpu_flag == 1:
+
+                # get link status flag
+                link_status_flag = (payload & 0x0010) >> 4
+
+                # get port
+                port = (payload & 0xff80) >> 7
+                # get other side of the link using port
+                neighbor = self.topo.port_to_node(switch_name, port)
+                # detect the affected link
+                affected_link = tuple(sorted([switch_name, neighbor]))
+
+                if link_status_flag == 1:
+                    # link is down
+
+                    # ignore duplicated notifications (both switches will notify the controller)
+                    if affected_link not in self.failed_links:
+                        print(f"Link failure detected: {affected_link}", flush=True)
+                        self.failed_links.add(affected_link)
+                        self.link_state_changed(list(self.failed_links))
+
+                else:
+                    # link is up
+
+                    # ignore duplicated notifications (both switches will notify the controller)
+                    if affected_link in self.failed_links:
+                        print(f"Link recovery detected: {affected_link}", flush=True)
+                        self.failed_links.remove(affected_link)
+                        self.link_state_changed(list(self.failed_links))
+
+    def _sniff_cpu_ports(self):
+        """Sniffs traffic coming from switches"""
+        cpu_interfaces = [str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers]
+        sniff(iface=cpu_interfaces, prn=self._process_packet)
+
     def run(self):
         """Run function"""
+        self.install_base_table_entries()
+        self.install_paths(self.paths)
 
+    def install_base_table_entries(self):
         for sw_name in self.topo.get_p4switches():
 
             # install table entry for the directly connected hosts
@@ -318,18 +447,55 @@ class Controller(object):
                     [neighbor_mac, str(port_num)],
                 )
 
-        self.install_paths(self.paths)
+    def install_paths(self, all_paths, previous_paths={}):
+        st = time.time()
 
-    def install_paths(self, all_paths):
-        self.ecmp_group_counters = collections.defaultdict(int)
+        # print(f"all paths: {all_paths}")
+
+        to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))
+        set_all_paths = to_set(all_paths)
+        set_previous_paths = to_set(previous_paths)
+
+        same = set_all_paths & set_previous_paths
+        added = set_all_paths - set_previous_paths
+        removed = set_previous_paths - set_all_paths
 
         for (sw_name, controller) in self.controllers.items():
 
+            for (key, _) in removed:
+                (src_fe, dst_fe) = key
+                paths = previous_paths[key]
+
+                if len(paths) == 0:
+                    print("WARNING: empty list of paths passed, skipping")
+                    continue
+
+                if paths[0][-2] == sw_name:
+                    continue
+
+                src_ip = self.topo.get_host_ip(src_fe.host)
+                dst_ip = self.topo.get_host_ip(dst_fe.host)
+
+                # TODO: We do not remove the paths from table virtual_circuit_paths.
+                # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
+                self.controllers[sw_name].table_delete_match(
+                    "virtual_circuit",
+                    [
+                        str(src_ip),
+                        str(dst_ip),
+                        str(src_fe.port),
+                        str(dst_fe.port),
+                        str(6 if src_fe.protocol == "tcp" else 17),
+                    ]
+                )
+
             print(f"done removing circuits at {sw_name}")
 
-            for key in all_paths:
+
+            for (key, _) in added:
                 (src_fe, dst_fe) = key
                 paths = all_paths[key]
+
                 if len(paths) == 0:
                     print("WARNING: empty list of paths passed, skipping")
                     continue
@@ -339,11 +505,11 @@ class Controller(object):
                 if paths[0][-2] == sw_name:
                     continue
 
-                src_ip = self.topo.get_host_ip(src_fe.host)  # + '/32'
-                dst_ip = self.topo.get_host_ip(dst_fe.host)  # + '/32'
+                src_ip = self.topo.get_host_ip(src_fe.host)
+                dst_ip = self.topo.get_host_ip(dst_fe.host)
 
                 print(src_ip, dst_ip)
-                # install entry in ecmp_FEC_tbl
+                # install entry in virtual_circuit_path table
                 for idx, path in enumerate(paths):
                     path_wo_hosts = path[1:-1]
                     print(path, path_wo_hosts)
@@ -362,6 +528,7 @@ class Controller(object):
                         action_args,
                     )
 
+                # install entry in virtual_circuit table
                 self.controllers[sw_name].table_add(
                     "virtual_circuit",
                     "ecmp_group",
@@ -377,6 +544,10 @@ class Controller(object):
                 self.ecmp_group_counters[sw_name] += 1
 
             print(f"done adding circuits at {sw_name}")
+
+        et = time.time()
+        print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")
+        print(f"Installing paths took {et - st}", flush=True)
 
     def get_mpls_stack(self, path) -> List[int]:
         """

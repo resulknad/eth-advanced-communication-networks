@@ -12,6 +12,8 @@
 #define ID_WIDTH 16
 #define FLOWLET_TIMEOUT 48w200000
 
+#define FAILURE_THRESHOLD 48w500000 // 0.5s # WARNING: must be bigger than heartbeat frequency.
+
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -30,6 +32,13 @@ control MyIngress(inout headers hdr,
 
     register<bit<ID_WIDTH>>(REGISTER_SIZE) flowlet_to_id;
     register<bit<TIMESTAMP_WIDTH>>(REGISTER_SIZE) flowlet_time_stamp;
+
+    // stores timestamp of latest heartbeat received on that port
+    register<bit<48>>(CONST_MAX_LABELS) tstamp_ports;
+
+    // stores latest known link state, where 0 indicates "up" and 1 indicates "down"
+    register<bit<1>>(CONST_MAX_LABELS) linkState;
+
 
     action no_action() {
     }
@@ -145,7 +154,6 @@ control MyIngress(inout headers hdr,
         }
         actions = {
             set_nhop;
-            ecmp_group;
             drop;
         }
         default_action = drop;
@@ -1052,34 +1060,6 @@ control MyIngress(inout headers hdr,
      * This table maps the selected path (identified by the ecmp_group_id and ecmp_hash) to the actual
      * path in the form of a label stack.
      */
-    table ecmp_FEC_tbl {
-        key = {
-            meta.ecmp_group_id: exact;
-            meta.ecmp_hash: exact;
-        }
-        actions = {
-            mpls_ingress_1_hop;
-            mpls_ingress_2_hop;
-            mpls_ingress_3_hop;
-            mpls_ingress_4_hop;
-            mpls_ingress_5_hop;
-            mpls_ingress_6_hop;
-            mpls_ingress_7_hop;
-            mpls_ingress_8_hop;
-            mpls_ingress_9_hop;
-            mpls_ingress_10_hop;
-            mpls_ingress_11_hop;
-            mpls_ingress_12_hop;
-            mpls_ingress_13_hop;
-            mpls_ingress_14_hop;
-            mpls_ingress_15_hop;
-            mpls_ingress_16_hop;
-            drop;
-        }
-        default_action = drop;
-        size = 256;
-    }
-
     table virtual_circuit_path {
         key = {
             meta.ecmp_group_id: exact;
@@ -1152,6 +1132,12 @@ control MyIngress(inout headers hdr,
         size = CONST_MAX_LABELS * 2;
     }
 
+    action send_heartbeat(){
+        // we make sure the other switch treats the packet as probe from the other side
+        hdr.heartbeat.from_cp = 0;
+        standard_metadata.egress_spec = hdr.heartbeat.port;
+    }
+
     action get_tcp_ports() {
         meta.srcPort = hdr.tcp.srcPort;
         meta.dstPort = hdr.tcp.dstPort;
@@ -1163,6 +1149,60 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
+
+        // handle heartbeat messages
+        if (hdr.heartbeat.isValid()) {
+
+            if (hdr.heartbeat.from_cp == 1) {
+                // heartbeat was received from the controller
+
+                // read timestamp of last received heartbeat on that port
+                tstamp_ports.read(meta.timestamp, (bit<32>) hdr.heartbeat.port);
+
+                // check if last timestamp is more than FAILURE_THRESHOLD ago and we haven't detected this failure before
+                linkState.read(meta.linkState, (bit<32>) hdr.heartbeat.port);
+                if (meta.timestamp != 0 && (standard_metadata.ingress_global_timestamp - meta.timestamp > FAILURE_THRESHOLD)
+                    && meta.linkState == 0) {
+
+                    // update link state
+                    linkState.write((bit<32>) hdr.heartbeat.port, 1);
+
+                    // store those header values that need to be set on the cloned packet
+                    meta.affectedPort = hdr.heartbeat.port;
+                    meta.linkState = 1;
+
+                    // clone to notify the controller of the failure
+                    clone3(CloneType.I2E, 100, meta);
+                }
+
+                // still need to send the heartbeat to our neighbor
+                send_heartbeat();
+
+            } else {
+                // heartbeat was received from a neighbor
+
+                // update timestamp of last received packet on that port
+                tstamp_ports.write((bit<32>) standard_metadata.ingress_port, standard_metadata.ingress_global_timestamp);
+
+                // check if this link has been down until now
+                linkState.read(meta.linkState, (bit<32>) standard_metadata.ingress_port);
+                if (meta.linkState == 1) {
+
+                    // update link state
+                    linkState.write((bit<32>)standard_metadata.ingress_port, 0);
+
+                    // store those header values that need to be set on the cloned packet
+                    meta.affectedPort = standard_metadata.ingress_port;
+                    meta.linkState = 0;
+
+                    // clone to notify the controller of the recovery
+                    clone3(CloneType.I2E, 100, meta);
+                }
+
+                drop();
+            }
+        }
+
         // handle non-MPLS packets
         if (hdr.ipv4.isValid() && !hdr.mpls[0].isValid()) {
 
@@ -1193,19 +1233,11 @@ control MyIngress(inout headers hdr,
                 get_random_flowlet_id();
             }
 
-            switch (virtual_circuit.apply().action_run) {
-                ecmp_group: {
-                    virtual_circuit_path.apply();
-                }
-                no_action: {
-                    switch (ipv4_lpm.apply().action_run) {
-                        ecmp_group: {
-                            ecmp_FEC_tbl.apply();
-                        }
-                    }
-                }
+            if (virtual_circuit.apply().hit) {
+                virtual_circuit_path.apply();
+            } else {
+                ipv4_lpm.apply();
             }
-
 
         }
 
@@ -1224,6 +1256,13 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
     apply {
+
+        if (hdr.heartbeat.isValid() && standard_metadata.instance_type == 1) {
+            // set failed link flag for the clone we send to the cp
+            hdr.heartbeat.from_switch_to_cpu = 1;
+            hdr.heartbeat.link_status = meta.linkState;
+            hdr.heartbeat.port = meta.affectedPort;
+        }
 
     }
 }

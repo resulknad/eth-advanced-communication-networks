@@ -19,10 +19,10 @@ import time
 
 TYPE_HEARTBEAT = 0x1234
 
-TOTAL_TIME = 60 # seconds
+TOTAL_TIME = 60  # seconds
 
 # parameters
-MCF_INTERVAL_SIZE = 5 # seconds
+MCF_INTERVAL_SIZE = 5  # seconds
 NORMALIZE_BW_ACROSS_TIME = False
 UDP_COST_MULTIPLIER = 1
 TCP_COST_MULTIPLIER = 1
@@ -36,7 +36,9 @@ TCP_END_TIME_MULTIPLIER = 1.5
 
 # SLA selection
 FILTER_SLA_MAX_PORT = 200
-FILTER_INCLUDE_SLA_BY_NAME = ["prr_28"] # this basically means include UDP flows from 200-300
+FILTER_INCLUDE_SLA_BY_NAME = [
+    "prr_28"
+]  # this basically means include UDP flows from 200-300
 
 
 class Controller(object):
@@ -187,7 +189,6 @@ class Controller(object):
         t.start()
         print("started listening for link state notifications")
 
-
     def init_mcf(self, base_traffic, topology, slas):
         self._preprocess_slas(slas)
 
@@ -311,7 +312,6 @@ class Controller(object):
 
         self.paths = flows_to_path
 
-
     def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""
         self.connect_to_switches()
@@ -370,7 +370,7 @@ class Controller(object):
                 link_status_flag = (payload & 0x0010) >> 4
 
                 # get port
-                port = (payload & 0xff80) >> 7
+                port = (payload & 0xFF80) >> 7
                 # get other side of the link using port
                 neighbor = self.topo.port_to_node(switch_name, port)
                 # detect the affected link
@@ -396,7 +396,10 @@ class Controller(object):
 
     def _sniff_cpu_ports(self):
         """Sniffs traffic coming from switches"""
-        cpu_interfaces = [str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers]
+        cpu_interfaces = [
+            str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1"))
+            for sw_name in self.controllers
+        ]
         sniff(iface=cpu_interfaces, prn=self._process_packet)
 
     def run(self):
@@ -486,11 +489,10 @@ class Controller(object):
                         str(src_fe.port),
                         str(dst_fe.port),
                         str(6 if src_fe.protocol == "tcp" else 17),
-                    ]
+                    ],
                 )
 
             print(f"done removing circuits at {sw_name}")
-
 
             for (key, _) in added:
                 (src_fe, dst_fe) = key

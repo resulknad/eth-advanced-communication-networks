@@ -78,6 +78,7 @@ class Controller(object):
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
+        # Stores the end-time of each interval
         self.intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
@@ -85,7 +86,7 @@ class Controller(object):
         start_time = 0
         for end_time in self.intervals:
             flows = df[
-                (df["start_time"] <= end_time) & (df["end_time"] >= start_time)
+                (df["start_time"] < end_time) & (df["end_time"] >= start_time)
             ]
 
             self.flows_for_interval[end_time] = flows
@@ -129,18 +130,13 @@ class Controller(object):
         df = pd.read_csv(self.slas_file)
         df = df.rename(columns=lambda x: x.strip())
 
-        # -1 will be value for wildcard
-        df["sport"] = df["sport"].str.replace("*", "-1")
         sport = df["sport"].str.split("--", n=1, expand=True)
-        df["sport_start"], df["sport_end"] = sport[0].astype("int32"), sport[1].astype(
-            "int32"
-        )
+        df["sport_start"] = sport[0].replace('*', '0').astype("int32")
+        df["sport_end"] = sport[1].replace('*', '65535').astype("int32")
 
-        df["dport"] = df["dport"].str.replace("*", "-1")
         dport = df["dport"].str.split("--", n=1, expand=True)
-        df["dport_start"], df["dport_end"] = dport[0].astype("int32"), dport[1].astype(
-            "int32"
-        )
+        df["dport_start"] = dport[0].replace('*', '0').astype("int32")
+        df["dport_end"] = dport[1].replace('*', '65535').astype("int32")
 
         # select SLAs that should be considered
         df = df[
@@ -157,7 +153,7 @@ class Controller(object):
         ]
         self.filtered_slas = df
 
-    def _compute_paths_mcf(self, failures=[]):
+    def _compute_paths_mcf(self, failures=None):
         """Computes paths by solving a multi-commodity flow problem for each time interval, taking into account a list of failed links.
         The paths are stored as an attribute.
         Note: self.init_mcf() should have been called once beforehand.
@@ -165,6 +161,9 @@ class Controller(object):
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
         """
+
+        if failures is None:
+            failures = []
 
         flows_to_path = defaultdict(list)
         flows_to_path_weights = defaultdict(list)
@@ -180,7 +179,7 @@ class Controller(object):
 
             interval_length = end_time - start_time
 
-            for (i, f) in flows.iterrows():
+            for (_, f) in flows.iterrows():
                 if self._slas_for_flow(
                     f["src"], f["sport"], f["dst"], f["dport"], f["protocol"]
                 ):
@@ -262,15 +261,11 @@ class Controller(object):
             list(pandas.Series): The SLAs that apply to the given flow
         """
         relevant_slas = []
-        for (indx, sla) in self.filtered_slas.iterrows():
+        for (_, sla) in self.filtered_slas.iterrows():
             src_match = sla.src == "*" or sla.src == from_host
-            src_port_match = (sla.sport_start <= from_port) and (
-                sla.sport_end == -1 or sla.sport_end >= from_port
-            )
+            src_port_match = sla.sport_start <= from_port <= sla.sport_end
             dst_match = sla.dst == "*" or sla.dst == to_host
-            dst_port_match = (sla.dport_start <= to_port) and (
-                sla.dport_end == -1 or sla.dport_end >= to_port
-            )
+            dst_port_match = sla.dport_start <= to_port <= sla.dport_end
 
             if (
                 src_match

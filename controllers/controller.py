@@ -161,6 +161,7 @@ class Controller(object):
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
         """
+        st = time.time()
 
         if failures is None:
             failures = []
@@ -246,6 +247,9 @@ class Controller(object):
             start_time = end_time
 
         self.paths = flows_to_path
+
+        et = time.time()
+        print(f"Computing new paths took {et - st}", flush=True)
 
     def _slas_for_flow(self, from_host, from_port, to_host, to_port, protocol):
         """Returns all SLAs that apply to a given flow.
@@ -432,6 +436,7 @@ class Controller(object):
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
         """
+
         print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
         print("Recomputing MCF solution")
@@ -563,7 +568,7 @@ class Controller(object):
                 print(path, path_wo_hosts)
                 labels = self._get_mpls_stack(path_wo_hosts)
                 print(labels)
-                num_hops = len(path_wo_hosts) - 1
+                num_hops = len(labels)
                 action_name = f"mpls_ingress_{num_hops}_hop"
                 action_args = list(map(str, labels[::-1]))
 

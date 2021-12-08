@@ -513,89 +513,84 @@ class Controller(object):
         added = set_all_paths - set_previous_paths
         removed = set_previous_paths - set_all_paths
 
-        for (sw_name, controller) in self.controllers.items():
+        # remove paths
+        for key, _ in removed:
+            paths = previous_paths[key]
 
-            for (key, _) in removed:
-                (src_fe, dst_fe) = key
-                paths = previous_paths[key]
+            if len(paths) == 0:
+                print("WARNING: empty list of paths passed, skipping")
+                continue
 
-                if len(paths) == 0:
-                    print("WARNING: empty list of paths passed, skipping")
-                    continue
+            sw_name = paths[0][1]
 
-                if paths[0][-2] == sw_name:
-                    continue
+            (src_fe, dst_fe) = key
+            src_ip = self.topo.get_host_ip(src_fe.host)
+            dst_ip = self.topo.get_host_ip(dst_fe.host)
 
-                src_ip = self.topo.get_host_ip(src_fe.host)
-                dst_ip = self.topo.get_host_ip(dst_fe.host)
+            # TODO: We do not remove the paths from table virtual_circuit_paths.
+            # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
+            self.controllers[sw_name].table_delete_match(
+                "virtual_circuit",
+                [
+                    str(src_ip),
+                    str(dst_ip),
+                    str(src_fe.port),
+                    str(dst_fe.port),
+                    str(6 if src_fe.protocol == "tcp" else 17),
+                ],
+            )
 
-                # TODO: We do not remove the paths from table virtual_circuit_paths.
-                # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
-                self.controllers[sw_name].table_delete_match(
-                    "virtual_circuit",
-                    [
-                        str(src_ip),
-                        str(dst_ip),
-                        str(src_fe.port),
-                        str(dst_fe.port),
-                        str(6 if src_fe.protocol == "tcp" else 17),
-                    ],
-                )
+        print("done removing circuits")
 
-            print(f"done removing circuits at {sw_name}")
+        # add paths
+        for key, _ in added:
+            paths = all_paths[key]
 
-            for (key, _) in added:
-                (src_fe, dst_fe) = key
-                paths = all_paths[key]
+            if len(paths) == 0:
+                print("WARNING: empty list of paths passed, skipping")
+                continue
 
-                if len(paths) == 0:
-                    print("WARNING: empty list of paths passed, skipping")
-                    continue
+            sw_name = paths[0][1]
 
-                # on the destination switch we want a miss in the virtual_circuit table
-                # in order for ipv4_lpm to apply and generate a hit...
-                if paths[0][-2] == sw_name:
-                    continue
+            (src_fe, dst_fe) = key
+            src_ip = self.topo.get_host_ip(src_fe.host)
+            dst_ip = self.topo.get_host_ip(dst_fe.host)
 
-                src_ip = self.topo.get_host_ip(src_fe.host)
-                dst_ip = self.topo.get_host_ip(dst_fe.host)
+            # install entry in virtual_circuit_path table
+            for idx, path in enumerate(paths):
+                path_wo_hosts = path[1:-1]
+                print(path, path_wo_hosts)
+                labels = self._get_mpls_stack(path_wo_hosts)
+                print(labels)
+                num_hops = len(path_wo_hosts) - 1
+                action_name = f"mpls_ingress_{num_hops}_hop"
+                action_args = list(map(str, labels[::-1]))
 
-                print(src_ip, dst_ip)
-                # install entry in virtual_circuit_path table
-                for idx, path in enumerate(paths):
-                    path_wo_hosts = path[1:-1]
-                    print(path, path_wo_hosts)
-                    labels = self._get_mpls_stack(path_wo_hosts)
-                    print(labels)
-                    num_hops = len(path_wo_hosts) - 1
-                    action_name = f"mpls_ingress_{num_hops}_hop"
-                    action_args = list(map(str, labels[::-1]))
-
-                    # add rule
-                    print(f"table_add at {sw_name}")
-                    self.controllers[sw_name].table_add(
-                        "virtual_circuit_path",
-                        action_name,
-                        [str(self.ecmp_group_counters[sw_name]), str(idx)],
-                        action_args,
-                    )
-
-                # install entry in virtual_circuit table
+                # add rule
+                print(f"table_add at {sw_name}")
                 self.controllers[sw_name].table_add(
-                    "virtual_circuit",
-                    "ecmp_group",
-                    [
-                        str(src_ip),
-                        str(dst_ip),
-                        str(src_fe.port),
-                        str(dst_fe.port),
-                        str(6 if src_fe.protocol == "tcp" else 17),
-                    ],
-                    [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
+                    "virtual_circuit_path",
+                    action_name,
+                    [str(self.ecmp_group_counters[sw_name]), str(idx)],
+                    action_args,
                 )
-                self.ecmp_group_counters[sw_name] += 1
 
-            print(f"done adding circuits at {sw_name}")
+            # install entry in virtual_circuit table
+            self.controllers[sw_name].table_add(
+                "virtual_circuit",
+                "ecmp_group",
+                [
+                    str(src_ip),
+                    str(dst_ip),
+                    str(src_fe.port),
+                    str(dst_fe.port),
+                    str(6 if src_fe.protocol == "tcp" else 17),
+                ],
+                [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
+            )
+            self.ecmp_group_counters[sw_name] += 1
+
+        print("done adding circuits")
 
         et = time.time()
         print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")

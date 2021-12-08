@@ -1,6 +1,7 @@
 # Add any needed requirement for your controllers
 pandas
 pulp
+dataclasses
 
 # version 2.4.5 has a bug in sniff, see https://github.com/secdev/scapy/issues/3191
 scapy==2.4.4

@@ -1,16 +1,18 @@
-import json
-import pandas as pd
-from collections import defaultdict, deque
-from pulp import *
+from collections import defaultdict
+from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, LpStatus, value
 from copy import deepcopy
-from collections import namedtuple
-from edge import Edge
-
-FlowEndpoint = namedtuple("FlowEndpoint", ["host", "port", "protocol"])
+from collections import defaultdict
+from flow_endpoint import FlowEndpoint
+from commodity import Commodity
 
 
 class MCF:
     def __init__(self, graph):
+        """Initializes a new MCF (Multi Commodity Flow) problem on the graph given in the constructor
+
+        Args:
+            graph (graph.Graph): Graph on which the multi commodity flow problem should be solved.
+        """
         # copy because we will modify graph in here
         self.graph = deepcopy(graph)
         self.commodities = []
@@ -18,31 +20,44 @@ class MCF:
         self.waypoints = {}
 
     def _extend_graph_with_flow_endpoint(self, fe):
-        fe_str = self._flow_endpoint_to_string(fe)
-        self.graph.add_node(fe_str)
+        """Takes a FlowEndpoint (host, port, protocol) and extends the graph by adding a new node
+         for the endpoint and connecting it with an infinite capacity edge to the existing node host (so host:node:port <---> host)
+
+        Args:
+            fe (FlowEndpoint): A FlowEndpoint describing host:port:protocol
+
+        Returns:
+            str: A string representation of the newly added node
+        """
+        self.graph.add_node(str(fe))
+
         # add infinite capacity edges from the copies of the node to the actual node
-        self.graph.add_undirected_edge(fe_str, fe.host, delay=0, bw=(2 ** 32))
-        return fe_str
+        self.graph.add_undirected_edge(str(fe), fe.host, delay=0, bw=(2 ** 32))
+        return str(fe)
 
     def subtract_paths(self, paths, weights):
+        """Subtracts the given weighted paths from the local graph. Meaning the bandwidth is decreased along each edge
+        on the path by the weight.
+
+        Args:
+            paths (list of paths): list of list of nodes describing multiple paths
+            weights (list of floats): one weight per path
+        """
         for path, weight in zip(paths, weights):
-            for (n1, n2) in zip(path, path[1:]):
-                e = self.graph.edges_map[str(Edge(n1, n2, 0, 0))]
-                if e.bw - weight < 0:
-                    print(
-                        "WARNING: path has too large of a weight, cannot subtract it. something does not add up",
-                        e,
-                        weight,
-                    )
-                e.bw = max(0, e.bw - weight)
+            self.graph.subtract_path(path, weight)
 
     def remove_failed_link(self, n1, n2):
-        e = self.graph.edges_map[str(Edge(n1, n2, 0, 0))]
-        e.bw = 0
+        """Removes a filed link from the local graph representation by setting its bandwidth (capacity) to 0
+        in both directions
+
+        Args:
+            n1 (str): first node
+            n2 (str): second node
+        """
+        self.graph.set_edge_bw(n1, n2, 0)
 
         # same for other direction
-        e = self.graph.edges_map[str(Edge(n2, n1, 0, 0))]
-        e.bw = 0
+        self.graph.set_edge_bw(n2, n1, 0)
 
     def add_flow(
         self,
@@ -53,6 +68,27 @@ class MCF:
         cost_multiplier=1,
         add_on_conflict=False,
     ):
+        """Adds a new commodity in our MCF. This function first adds two new nodes in the local graph for the specific flow endpoints.
+        Recall that a single commodity is per-flow so the unique identifier is: (host1:port1:protocol) <-> (host2:port2:protocol).
+        Those flow endpoint nodes are connected to the more general host nodes by an infinite capacity edge.
+
+        A commodity describes the amount of traffic we would like to send from the source to the destination under minimal cost.
+        Cost in our model is the link delay.
+
+        Args:
+            src (FlowEndpoint): A flow endpoint
+            dst (FlowEndpoint): Second flow endpoint
+            demand (float): How much bandwidth the flow requires.
+            allow_dup_commodity (bool, optional): [description]. This is used internally for waypointing.
+                        About how we handle duplicate commodities
+            cost_multiplier (int, optional): [description]. Multiplies the commodities cost relative to the other commodities.
+                        Encourages solutions which have a smaller delay for this specific flow.
+            add_on_conflict (bool, optional): [description]. Should demands be added or the maximum taken out of the two,
+                        if a commodity already exists and this function is called again.
+
+        Returns:
+            int: commodity id
+        """
         src_node = self._extend_graph_with_flow_endpoint(src)
         dst_node = self._extend_graph_with_flow_endpoint(dst)
 
@@ -68,6 +104,21 @@ class MCF:
 
         return (src_node, dst_node, commodity_id)
 
+    def _get_commodity_by_src_and_dst(self, source, destination):
+        """Returns the commodity for the given source destination pair. None if not found.
+
+        Args:
+            source (str): Source node in graph
+            destination (str): Destination node in graph
+
+        Returns:
+            (int, Commodity): index and commodity
+        """
+        for i, commodity in enumerate(self.commodities):
+            if (commodity.source, commodity.target) == (source, destination):
+                return (i, commodity)
+        return (None, None)
+
     def _add_commodity(
         self,
         source,
@@ -77,40 +128,69 @@ class MCF:
         cost_multiplier=1,
         add_on_conflict=False,
     ):
-        if not allow_dup_commodity:
-            for (indx, (s, t, d, cm)) in enumerate(self.commodities):
-                if (s, t) == (source, target):
-                    print(
-                        "WARNING: already have commodity for ",
-                        s,
-                        t,
-                        ". Will",
-                        "add" if add_on_conflict else "take max out of",
-                        "the demands",
-                        demand,
-                        "and",
-                        d,
-                    )
-                    self.commodities[indx] = (
-                        s,
-                        t,
-                        max(d, demand) if not add_on_conflict else d + demand,
-                        max(cm, cost_multiplier),
-                    )
-                    return
-        self.commodities.append((source, target, demand, cost_multiplier))
+        """Adds a commodity from source node to target node with given demand. Nodes must exist, used only internally.
+        Add commodities via add_flow.
+
+        Args:
+            source (str): sourcenode
+            target (str): targetnode
+            demand (float): demand in bandwidth
+            allow_dup_commodity (bool, optional): [description]. Defaults to False.
+            cost_multiplier (int, optional): [description]. Defaults to 1.
+            add_on_conflict (bool, optional): [description]. Defaults to False.
+
+        Returns:
+            int: commodity id
+        """
+        # if we do not want duplicate commodites (i.e. from same source to same target)
+        # then we need to check whether a commodity exists and if so either add up the demands
+        # or take the maximum (depending on the argument add_on_conflict)
+        _, commodity = self._get_commodity_by_src_and_dst(source, target)
+        if not allow_dup_commodity and commodity is not None:
+            print(
+                "WARNING: already have commodity for {} to {}. Will {} the demands {} and {}".format(
+                    commodity.source,
+                    commodity.target,
+                    "add" if add_on_conflict else "take max out of",
+                    demand,
+                    commodity.demand,
+                )
+            )
+
+            if add_on_conflict:
+                commodity.demand += demand
+            else:
+                commodity.demand = max(demand, commodity.demand)
+
+            commodity.cost_multiplier = max(commodity.cost_multiplier, cost_multiplier)
+            return
+
+        # can simply add a new commodity here
+        self.commodities.append(Commodity(source, target, demand, cost_multiplier))
         return len(self.commodities) - 1
 
     def add_waypoint_to_all(self, source, target, waypoint, protocol):
+        """Adds a waypointing requirement to all previously added flows (commodities) matching the given
+        source, target and protocol. Does it by splitting the commodities into two distinct commodities
+        so (source -> target) gets (source -> waypoint) and (waypoint -> target).
+
+        Args:
+            source (str): Source hostname
+            target (str): Destination hostname
+            waypoint (str): Waypoint hostname
+            protocol (str): Protocol (tcp/udp)
+        """
         wp = FlowEndpoint(host=waypoint, port=1, protocol=protocol)
         wps_to_add = []
 
         # first we make a list of all flows that match the waypoint
         # this is done in two steps because waypointing changes the commodities
-        for (indx, (s, t, d, cm)) in enumerate(self.commodities):
-            # parse host:port:protocol
-            s_fe = self._get_flow_endpoint(s)
-            t_fe = self._get_flow_endpoint(t)
+        for commodity in self.commodities:
+            if commodity.is_empty():
+                continue
+
+            s_fe = commodity.source_as_fe()
+            t_fe = commodity.target_as_fe()
             if (
                 s_fe.host == source
                 and t_fe.host == target
@@ -123,10 +203,19 @@ class MCF:
             self.add_waypoint_to_flow(*wp)
 
     def add_waypoint_to_flow(self, source, target, waypoint):
-        source_str = self._flow_endpoint_to_string(source)
-        target_str = self._flow_endpoint_to_string(target)
+        """Adds a waypoint to the given pair of FlowEndpoints. This inserts the given waypoint FlowEndpoint in the graph.
+        Expects the source and target pair of FlowEndpoints to exist as nodes in the graph and as a part of a commodity
+        which has been previously added.
 
-        if (source_str, target_str) in self.waypoints:
+        Args:
+            source (FlowEndpoint): Source
+            target (FlowEndpoint): Destination
+            waypoint (FlowEndpoint): Waypoint
+
+        Returns:
+            str: string identifier of the waypoint node
+        """
+        if (str(source), str(target)) in self.waypoints:
             print(
                 "WARNING: already have a waypoint for {} --- {} ----> {}. since a call to waypoints makes changes to the commodities"
                 + ", it is of crucial importance to call add_waypoint after setting up all commodoties and only once. IGNORING".format(
@@ -140,49 +229,51 @@ class MCF:
             print("WARNING: failed to add waypoint node. cannot add waypoint...")
             return False
 
-        index = list(
-            filter(
-                lambda tpl: tpl[1][0] == source_str and tpl[1][1] == target_str,
-                enumerate(self.commodities),
-            )
-        )
-        if len(index) == 0:
+        index, commodity = self._get_commodity_by_src_and_dst(str(source), str(target))
+        if commodity is None:
             print(
                 "WARNING: cannot add waypoint {} --- {} ----> {} for commodity/flow which has not been added yet. IGNORING.".format(
                     source, waypoint, target
                 )
             )
             return
-        if len(index) > 1:
-            raise Warning(
-                "ERROR: cannot have multiple commodities for one src target pair. FAILING"
-            )
 
-        (s, t, d, cm) = self.commodities[index[0][0]]
-        self.commodities[index[0][0]] = ("", "", 0, 0)
-        assert s == self._flow_endpoint_to_string(
-            source
-        ) and t == self._flow_endpoint_to_string(target)
+        # delete non-waypointed commodity, but since we are using indexes as ids
+        # we add an empty commodity
+        self.commodities[index] = Commodity("", "", 0, 0)
 
-        commodity1 = self._add_commodity(
-            s, self._flow_endpoint_to_string(waypoint), d, True, cost_multiplier=cm
-        )
-        commodity2 = self._add_commodity(
-            self._flow_endpoint_to_string(waypoint), t, d, True, cost_multiplier=cm
-        )
+        assert commodity.source == str(source) and commodity.target == str(target)
 
-        self.waypoints[(source_str, target_str)] = (
+        commodity1_id = self._add_commodity(
+            commodity.source,
             waypoint_str,
-            commodity1,
-            commodity2,
+            commodity.demand,
+            True,
+            cost_multiplier=commodity.cost_multiplier,
+        )
+        commodity2_id = self._add_commodity(
+            waypoint_str,
+            commodity.target,
+            commodity.demand,
+            True,
+            cost_multiplier=commodity.cost_multiplier,
         )
 
-        # print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))
+        self.waypoints[(str(source), str(target))] = (
+            waypoint_str,
+            commodity1_id,
+            commodity2_id,
+        )
 
     def make_lp(self):
+        """This creates a linear program out of the graph and commodities collected in this instance.
+        Refer to the readme to see a thorough explanation of our LP.
+
+        Returns:
+            LpProblem: the linear program in all its glory
+        """
         prob = LpProblem("Problem", LpMinimize)
 
-        # all_vars_str = list(map("_".join, itertools.product(edges_str, commodities_str)))
         # creating one variable for each edge + commodity combination
         edges_str = list(map(str, self.graph.edges))
         edges_capacity = {str(e): e.bw for e in self.graph.edges}
@@ -194,7 +285,7 @@ class MCF:
         cost = {
             edge: {
                 commodity: self.graph.edges_map[edge].delay
-                * self.commodities[int(commodity)][3]
+                * self.commodities[int(commodity)].cost_multiplier
                 for commodity in commodities_str
             }
             for edge in edges_str
@@ -204,7 +295,7 @@ class MCF:
         # add excess edges (as in PBR)
         # this ensure that LP is always feasible
         excess_edges_str = [
-            "|".join([c[0], c[1]]) + "_commodity" + str(i)
+            "|".join([c.source, c.target]) + "_commodity" + str(i)
             for (i, c) in enumerate(self.commodities)
         ]
 
@@ -217,15 +308,7 @@ class MCF:
             + lpSum([excess_variables[e] * (2 ** 16) for e in excess_edges_str]),
             "Sum_of_edge_commodity_cost",
         )
-        # + lpSum(
-        #      [
-        #          (
-        #              excess_variables["LON|LIS_commodity0"]
-        #              - excess_variables["LON|BER_commodity1"]
-        #          )
-        #          * (2 ** 32)
-        #          for e in excess_edges_str
-        #      ]
+
         # add capacity constaints
         for e in variables:
             prob += (
@@ -236,8 +319,8 @@ class MCF:
         # add flow conservation
         # (except for supply / demand nodes)
         for c in range(len(self.commodities)):
-            src, target, demand, cm = self.commodities[c]
-            if src == "":
+            commodity = self.commodities[c]
+            if commodity.source == "":
                 continue
             for (name, node) in self.graph.nodes.items():
                 outgoing = list(filter(lambda s: s.startswith(name + "|"), edges_str))
@@ -258,11 +341,11 @@ class MCF:
                     )
                 )
                 val = 0
-                if src == name:
-                    val = -demand
+                if commodity.source == name:
+                    val = -commodity.demand
                     # print(outgoing_excess, incoming_excess)
-                elif target == name:
-                    val = demand
+                elif commodity.target == name:
+                    val = commodity.demand
 
                 prob += (
                     lpSum([variables[e][str(c)] for e in incoming])
@@ -278,17 +361,29 @@ class MCF:
         # basically we split a commodity into two commodities
         # and now require that either both are satisfied to the same degree
         # or not at all (by requiring that excess is equal)
-        for (src, target), (_, c1, c2) in self.waypoints.items():
-            c1_src, c1_target, _, _ = self.commodities[c1]
-            c2_src, c2_target, _, _ = self.commodities[c2]
+        for (src, target), (_, c1_id, c2_id) in self.waypoints.items():
+            c1 = self.commodities[c1_id]
+            c2 = self.commodities[c2_id]
             prob += (
-                excess_variables["{}|{}_commodity{}".format(c1_src, c1_target, c1)]
-                == excess_variables["{}|{}_commodity{}".format(c2_src, c2_target, c2)],
-                "%s_%s_%s_waypoint" % (c1_src, c1_target, c2_target),
+                excess_variables[
+                    "{}|{}_commodity{}".format(c1.source, c1.target, c1_id)
+                ]
+                == excess_variables[
+                    "{}|{}_commodity{}".format(c2.source, c2.target, c2_id)
+                ],
+                "%s_%s_%s_waypoint" % (c1.source, c1.target, c2.target),
             )
         return prob
 
     def make_and_solve_lp(self, verbose=False):
+        """Calls make_lp and then the solver on the linear program. Extracts the paths out of the solution.
+
+        Args:
+            verbose (bool, optional): [description]. Defaults to False.
+
+        Returns:
+            float: Excess, so the amount of demanded bandwidth that could not be satisfied.
+        """
         prob = self.make_lp()
         prob.solve(PULP_CBC_CMD(msg=0))
 
@@ -319,7 +414,7 @@ class MCF:
                 if v.name.startswith("Excess_"):
                     excess += v.varValue
 
-        paths = collections.defaultdict(list)
+        paths = defaultdict(list)
 
         # this is almost dfs, but it will visit some nodes twice
         # if they are shared on a path. graph is assumed to be a DAG
@@ -343,25 +438,25 @@ class MCF:
         all_paths = defaultdict(list)
         path_weights = defaultdict(list)
         # reconstruct paths out of adjencency lists for paths
-        for c in range(len(self.commodities)):
-            src, dst, _, _ = self.commodities[c]
+        for c_id in range(len(self.commodities)):
+            commodity = self.commodities[c_id]
 
-            n = src
+            n = commodity.source
 
             # adjacency list for commodity c
-            adj = result[c]
+            adj = result[c_id]
 
             # decompose flow into paths
-            paths = dfs(adj, [src], [2 ** 32])
+            paths = dfs(adj, [commodity.source], [2 ** 32])
             # remove length 1 paths
             paths = list(filter(lambda p: len(p[0]) != 1, paths))
 
-            all_paths[(src, dst, c)] = []
-            path_weights[(src, dst, c)] = []
+            all_paths[(commodity.source, commodity.target, c_id)] = []
+            path_weights[(commodity.source, commodity.target, c_id)] = []
 
             for p, weight in paths:
-                all_paths[(src, dst, c)].append(p)
-                path_weights[(src, dst, c)].append(weight)
+                all_paths[(commodity.source, commodity.target, c_id)].append(p)
+                path_weights[(commodity.source, commodity.target, c_id)].append(weight)
 
         self.paths = {}
         self.paths_weights = {}
@@ -388,13 +483,13 @@ class MCF:
             dst_wp_paths = all_paths.pop((waypoint, target, commodity2))
 
             self.paths[
-                (self._get_flow_endpoint(src), self._get_flow_endpoint(target))
+                (FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))
             ] = [
                 (p1[:-1] + p2[2:])[1:-1] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
 
             self.paths_weights[
-                (self._get_flow_endpoint(src), self._get_flow_endpoint(target))
+                (FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))
             ] = min(
                 path_weights[(src, waypoint, commodity1)],
                 path_weights[(waypoint, target, commodity2)],
@@ -402,7 +497,7 @@ class MCF:
 
         # add non-waypointed paths
         for (src, dst, cid), paths in all_paths.items():
-            src_dst_tpl = (self._get_flow_endpoint(src), self._get_flow_endpoint(dst))
+            src_dst_tpl = (FlowEndpoint.fromString(src), FlowEndpoint.fromString(dst))
             self.paths[src_dst_tpl] = [p[1:-1] for p in paths]
             self.paths_weights[src_dst_tpl] = path_weights[src_dst_tpl]
 
@@ -412,26 +507,22 @@ class MCF:
 
         return excess
 
-    def _get_flow_endpoint(self, name):
-        np = name.split(":")
-        return (
-            FlowEndpoint(name, 0, "")
-            if len(np) == 1
-            else FlowEndpoint(np[0], int(np[1]), np[2])
-        )
-
-    def _flow_endpoint_to_string(self, fe):
-        return "{}:{}:{}".format(fe.host, fe.port, fe.protocol)
-
     def get_paths(self):
+        """Returns the paths extracted from the solved LP."""
         return self.paths
 
     def get_paths_and_weights(self):
+        """Returns the paths extracted from the solved LP and the corresponding weights.
+
+        Returns:
+            (dict, list(float)): Paths and weights
+        """
         return (self.paths, self.paths_weights)
 
     def print_paths_summary(self):
+        """Prints the paths extracted from the solved LP for debugging purposes."""
         for ((src, dst), paths) in self.paths.items():
-            if src.host == "":
+            if src is None:
                 continue
             print(
                 "From {}:{} to {}:{} have {} paths".format(

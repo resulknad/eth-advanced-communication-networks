@@ -16,6 +16,8 @@ from heartbeat_generator import HeartBeatGenerator
 
 
 TYPE_HEARTBEAT = 0x1234
+TYPE_TCP = 0x6
+TYPE_UDP = 0x11
 TOTAL_TIME = 60  # seconds
 
 # ============================== TUNABLE PARAMETERS ==============================
@@ -529,6 +531,9 @@ class Controller(object):
 
             # TODO: We do not remove the paths from table virtual_circuit_paths.
             # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
+
+            # delete entry from virtual_circuit table
+            print(f"table_delete at {sw_name}")
             self.controllers[sw_name].table_delete_match(
                 "virtual_circuit",
                 [
@@ -536,7 +541,7 @@ class Controller(object):
                     str(dst_ip),
                     str(src_fe.port),
                     str(dst_fe.port),
-                    str(6 if src_fe.protocol == "tcp" else 17),
+                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
                 ],
             )
 
@@ -584,7 +589,7 @@ class Controller(object):
                     str(dst_ip),
                     str(src_fe.port),
                     str(dst_fe.port),
-                    str(6 if src_fe.protocol == "tcp" else 17),
+                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
                 ],
                 [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
             )

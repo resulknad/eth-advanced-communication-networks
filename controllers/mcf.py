@@ -26,7 +26,7 @@ class MCF:
 
     def subtract_paths(self, paths, weights):
         for path, weight in zip(paths, weights):
-            self.g.subtract_path(self, path, weight)
+            self.graph.subtract_path(self, path, weight)
 
     def remove_failed_link(self, n1, n2):
         self.graph.set_edge_bw(n1, n2, 0)
@@ -58,6 +58,12 @@ class MCF:
 
         return (src_node, dst_node, commodity_id)
 
+    def _get_commodity_by_src_and_dst(self, source, destination):
+        for i, commodity in enumerate(self.commodities):
+            if (commodity.source, commodity.target) == (source, destination):
+                return (i, commodity)
+        return (None, None)
+
     def _add_commodity(
         self,
         source,
@@ -67,28 +73,30 @@ class MCF:
         cost_multiplier=1,
         add_on_conflict=False,
     ):
+        # if we do not want duplicate commodites (i.e. from same source to same target)
+        # then we need to check whether a commodity exists and if so either add up the demands
+        # or take the maximum (depending on the argument add_on_conflict)
+        _, commodity = self._get_commodity_by_src_and_dst(source, target)
+        if not allow_dup_commodity and commodity is not None:
+            print(
+                "WARNING: already have commodity for {} to {}. Will {} the demands {} and {}".format(
+                    commodity.source,
+                    commodity.target,
+                    "add" if add_on_conflict else "take max out of",
+                    demand,
+                    commodity.demand,
+                )
+            )
 
-        if not allow_dup_commodity:
-            for c in self.commodities:
-                if (c.source, c.target) == (source, target):
-                    print(
-                        "WARNING: already have commodity for ",
-                        c.source,
-                        c.target,
-                        ". Will",
-                        "add" if add_on_conflict else "take max out of",
-                        "the demands",
-                        demand,
-                        "and",
-                        c.demand,
-                    )
-                    if add_on_conflict:
-                        c.demand += demand
-                    else:
-                        c.demand = max(demand, c.demand)
-                    c.cost_multiplier = max(c.cost_multiplier, cost_multiplier)
-                    return
+            if add_on_conflict:
+                commodity.demand += demand
+            else:
+                commodity.demand = max(demand, commodity.demand)
 
+            commodity.cost_multiplier = max(commodity.cost_multiplier, cost_multiplier)
+            return
+
+        # can simply add a new commodity here
         self.commodities.append(Commodity(source, target, demand, cost_multiplier))
         return len(self.commodities) - 1
 
@@ -98,10 +106,10 @@ class MCF:
 
         # first we make a list of all flows that match the waypoint
         # this is done in two steps because waypointing changes the commodities
-        for (indx, (s, t, d, cm)) in enumerate(self.commodities):
+        for commodity in self.commodities:
             # parse host:port:protocol
-            s_fe = FlowEndpoint.fromString(s)
-            t_fe = FlowEndpoint.fromString(t)
+            s_fe = commodity.source_as_fe()
+            t_fe = commodity.target_as_fe()
             if (
                 s_fe.host == source
                 and t_fe.host == target
@@ -131,38 +139,28 @@ class MCF:
             print("WARNING: failed to add waypoint node. cannot add waypoint...")
             return False
 
-        index = list(
-            filter(
-                lambda tpl: tpl[1].source == source_str and tpl[1].target == target_str,
-                enumerate(self.commodities),
-            )
-        )
-        if len(index) == 0:
+        index, commodity = self._get_commodity_by_src_and_dst(source, target)
+        if commodity is None:
             print(
                 "WARNING: cannot add waypoint {} --- {} ----> {} for commodity/flow which has not been added yet. IGNORING.".format(
                     source, waypoint, target
                 )
             )
             return
-        if len(index) > 1:
-            raise Warning(
-                "ERROR: cannot have multiple commodities for one src target pair. FAILING"
-            )
 
-        commodity = self.commodities[index[0][0]]
-        self.commodities[index[0][0]] = Commodity("", "", 0, 0)
+        self.commodities[index] = Commodity("", "", 0, 0)
         assert commodity.source == self._flow_endpoint_to_string(
             source
         ) and commodity.target == self._flow_endpoint_to_string(target)
 
-        commodity1 = self._add_commodity(
+        commodity1_id = self._add_commodity(
             commodity.source,
             self._flow_endpoint_to_string(waypoint),
             commodity.demand,
             True,
             cost_multiplier=commodity.cost_multiplier,
         )
-        commodity2 = self._add_commodity(
+        commodity2_id = self._add_commodity(
             self._flow_endpoint_to_string(waypoint),
             commodity.target,
             commodity.demand,
@@ -172,8 +170,8 @@ class MCF:
 
         self.waypoints[(source_str, target_str)] = (
             waypoint_str,
-            commodity1,
-            commodity2,
+            commodity1_id,
+            commodity2_id,
         )
 
         # print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))

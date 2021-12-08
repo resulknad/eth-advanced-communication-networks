@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from flow_endpoint import FlowEndpoint
 
 
 @dataclass
@@ -12,6 +13,12 @@ class Commodity:
         return "{}:{}:{}:{}".format(
             self.source, self.target, self.demand, self.cost_multiplier
         )
+
+    def target_as_fe(self):
+        return FlowEndpoint.fromString(self.target)
+
+    def source_as_fe(self):
+        return FlowEndpoint.fromString(self.source)
 
     def __hash__(self):
         return hash(str(self))

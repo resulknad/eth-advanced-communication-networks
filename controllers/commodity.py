@@ -14,6 +14,9 @@ class Commodity:
             self.source, self.target, self.demand, self.cost_multiplier
         )
 
+    def is_empty(self):
+        return self.source == "" or self.target == ""
+
     def target_as_fe(self):
         return FlowEndpoint.fromString(self.target)
 

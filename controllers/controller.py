@@ -293,7 +293,7 @@ class Controller(object):
 
             paths, weights = m.get_paths_and_weights()
             for (src, dst) in paths:
-                if src.host == "":
+                if src is None:
                     continue
                 if (src, dst) in flows_to_path:
                     print(

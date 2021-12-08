@@ -15,7 +15,8 @@ import threading
 import codecs
 
 from p4utils.utils.helper import load_topo
-from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
+
+TYPE_HEARTBEAT = 0x1234
 
 
 def build_packet(src_mac, dst_mac, heartbeat_port):
@@ -24,7 +25,7 @@ def build_packet(src_mac, dst_mac, heartbeat_port):
     # ethernet
     src_bytes = b"".join([codecs.decode(x,'hex') for x in src_mac.split(":")])
     dst_bytes = b"".join([codecs.decode(x,'hex') for x in dst_mac.split(":")])
-    eth = src_bytes + dst_bytes + struct.pack("!H", 0x1234)
+    eth = src_bytes + dst_bytes + struct.pack("!H", TYPE_HEARTBEAT)
 
     # heart beat
     heartbeat = heartbeat_port << 7 | (1 << 6) # port | cpu_bit

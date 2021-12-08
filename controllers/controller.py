@@ -3,8 +3,11 @@ from collections import defaultdict
 import threading
 import math
 import time
-from scapy.all import *
+from scapy.all import sniff, Ether, raw
 import pandas as pd
+import struct
+
+from typing import Dict
 
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
@@ -12,10 +15,8 @@ from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from graph import Graph
 from mcf import MCF
 from flow_endpoint import FlowEndpoint
-from heartbeat_generator import HeartBeatGenerator
+from heartbeat_generator import HeartBeatGenerator, TYPE_HEARTBEAT
 
-
-TYPE_HEARTBEAT = 0x1234
 TYPE_TCP = 0x6
 TYPE_UDP = 0x11
 TOTAL_TIME = 60  # seconds
@@ -57,7 +58,7 @@ class Controller(object):
         self.slas_file = slas
         self.topo_file = "topology.json"
         self.topo = load_topo(self.topo_file)
-        self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
+        self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
         self.ecmp_group_counters = defaultdict(int)
 
         self.init_mcf()

@@ -31,7 +31,7 @@ UDP_BW_MULTIPLIER = 1   # TODO: check if this can already be considered in _prep
 TCP_BW_MULTIPLIER = 1   # TODO: check if this can already be considered in _preprocess_base_traffic()
 TCP_ACK_BW_MULTIPLIER = 0.5
 HEARTBEAT_FREQUENCY = 0.1
-TCP_END_TIME_MULTIPLIER = 1.5 # TODO: check if this can already be considered in _preprocess_base_traffic()
+TCP_DURATION_MULTIPLIER = 1.5
 
 # ============================== SLA SELECTION ===================================
 # These parameters allow to select the SLAs that should be considered.
@@ -81,14 +81,7 @@ class Controller(object):
         start_time = 0
         for end_time in self.intervals:
             flows = df[
-                (df["start_time"] <= end_time)
-                & (
-                    (df["end_time"] >= start_time)
-                    | (
-                        (df["end_time"] * TCP_END_TIME_MULTIPLIER >= start_time)    # TODO: multiplying the (absolute) endtime doesn't make any sense!
-                        & (df["protocol"] == "tcp")
-                    )
-                )
+                (df["start_time"] <= end_time) & (df["end_time"] >= start_time)
             ]
 
             self.flows_for_interval[end_time] = flows
@@ -118,7 +111,7 @@ class Controller(object):
         for i, r in rows.iterrows():
             size = int(r["size"][:-2])
             df.loc[i, "rate"] = str(TCP_DEFAULT_BW) + "Mbps"
-            df.loc[i, "duration"] = size / TCP_DEFAULT_BW
+            df.loc[i, "duration"] = (size / TCP_DEFAULT_BW) * TCP_DURATION_MULTIPLIER
 
         # add end_time everywhere
         df["end_time"] = df["start_time"] + df["duration"]

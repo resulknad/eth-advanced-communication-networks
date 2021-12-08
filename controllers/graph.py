@@ -37,7 +37,7 @@ class Graph:
         """Adds an undirected edge to source <--> target with cost (delay) and capacity (bw).
 
         Args:
-            source (str): the source nod
+            source (str): the source node
             target (str): the destination node
             delay (float): cost / delay
             bw (float): capacity / bandwidth

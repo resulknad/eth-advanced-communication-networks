@@ -1,9 +1,7 @@
-import pandas as pd
-from collections import defaultdict, deque
+from collections import defaultdict
 from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, LpStatus, value
 from copy import deepcopy
-from collections import namedtuple, defaultdict
-from edge import Edge
+from collections import defaultdict
 from flow_endpoint import FlowEndpoint
 from commodity import Commodity
 
@@ -14,7 +12,8 @@ class MCF:
 
         Args:
             graph (graph.Graph): Graph on which the multi commodity flow problem should be solved.
-        """  # copy because we will modify graph in here
+        """
+        # copy because we will modify graph in here
         self.graph = deepcopy(graph)
         self.commodities = []
         self.paths = {}
@@ -73,7 +72,7 @@ class MCF:
         Recall that a single commodity is per-flow so the unique identifier is: (host1:port1:protocol) <-> (host2:port2:protocol).
         Those flow endpoint nodes are connected to the more general host nodes by an infinite capacity edge.
 
-        A commodity described the amount of traffic we would like to send from the source to the destination under minimal cost.
+        A commodity describes the amount of traffic we would like to send from the source to the destination under minimal cost.
         Cost in our model is the link delay.
 
         Args:
@@ -84,7 +83,7 @@ class MCF:
                         About how we handle duplicate commodities
             cost_multiplier (int, optional): [description]. Multiplies the commodities cost relative to the other commodities.
                         Encourages solutions which have a smaller delay for this specific flow.
-            add_on_conflict (bool, optional): [description]. Should demands be added when or the maximum taken out of the two,
+            add_on_conflict (bool, optional): [description]. Should demands be added or the maximum taken out of the two,
                         if a commodity already exists and this function is called again.
 
         Returns:
@@ -172,7 +171,7 @@ class MCF:
 
     def add_waypoint_to_all(self, source, target, waypoint, protocol):
         """Adds a waypointing requirement to all previously added flows (commodities) matching the given
-        source, target and protocol. Does it by splitting the commodities into two distinc commodities
+        source, target and protocol. Does it by splitting the commodities into two distinct commodities
         so (source -> target) gets (source -> waypoint) and (waypoint -> target).
 
         Args:
@@ -266,8 +265,6 @@ class MCF:
             commodity2_id,
         )
 
-        # print("waypointed {} to {} via {}".format(source_str, target_str, waypoint_str))
-
     def make_lp(self):
         """This creates a linear program out of the graph and commodities collected in this instance.
         Refer to the readme to see a thorough explanation of our LP.
@@ -277,7 +274,6 @@ class MCF:
         """
         prob = LpProblem("Problem", LpMinimize)
 
-        # all_vars_str = list(map("_".join, itertools.product(edges_str, commodities_str)))
         # creating one variable for each edge + commodity combination
         edges_str = list(map(str, self.graph.edges))
         edges_capacity = {str(e): e.bw for e in self.graph.edges}
@@ -312,15 +308,7 @@ class MCF:
             + lpSum([excess_variables[e] * (2 ** 16) for e in excess_edges_str]),
             "Sum_of_edge_commodity_cost",
         )
-        # + lpSum(
-        #      [
-        #          (
-        #              excess_variables["LON|LIS_commodity0"]
-        #              - excess_variables["LON|BER_commodity1"]
-        #          )
-        #          * (2 ** 32)
-        #          for e in excess_edges_str
-        #      ]
+
         # add capacity constaints
         for e in variables:
             prob += (
@@ -527,12 +515,12 @@ class MCF:
         """Returns the paths extracted from the solved LP and the corresponding weights.
 
         Returns:
-            (dict, list(float)): Pahts and weights
+            (dict, list(float)): Paths and weights
         """
         return (self.paths, self.paths_weights)
 
     def print_paths_summary(self):
-        """Prints the from the solved LP extracted paths for debugging purposes."""
+        """Prints the paths extracted from the solved LP for debugging purposes."""
         for ((src, dst), paths) in self.paths.items():
             if src is None:
                 continue

@@ -24,13 +24,13 @@ TOTAL_TIME = 60  # seconds
 
 MCF_INTERVAL_SIZE = 5  # seconds
 NORMALIZE_BW_ACROSS_TIME = False
-TCP_DEFAULT_BW = 10
+TCP_DEFAULT_BW = 10 # Mbps
 UDP_COST_MULTIPLIER = 1
 TCP_COST_MULTIPLIER = 1
-UDP_BW_MULTIPLIER = 1   # TODO: check if this can already be considered in _preprocess_base_traffic()
-TCP_BW_MULTIPLIER = 1   # TODO: check if this can already be considered in _preprocess_base_traffic()
+UDP_BW_MULTIPLIER = 1
+TCP_BW_MULTIPLIER = 1
 TCP_ACK_BW_MULTIPLIER = 0.5
-HEARTBEAT_FREQUENCY = 0.1
+HEARTBEAT_FREQUENCY = 0.1   # seconds
 TCP_DURATION_MULTIPLIER = 1.5
 
 # ============================== SLA SELECTION ===================================
@@ -40,6 +40,7 @@ FILTER_SLA_MAX_PORT = 200
 FILTER_INCLUDE_SLA_BY_NAME = [
     "prr_28"    # this basically means include UDP flows from 200-300
 ]
+FILTER_INCLUDE_WAYPOINTS = True
 
 
 class Controller(object):
@@ -205,10 +206,11 @@ class Controller(object):
                         # find path for that new flow
                         self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
 
-            # add wps
-            wps = self._get_waypoints()
-            for (src, target, wp, protocol) in wps:
-                m.add_waypoint_to_all(src, target, wp, protocol)
+            # add waypoints
+            if FILTER_INCLUDE_WAYPOINTS:
+                wps = self._get_waypoints()
+                for (src, target, wp, protocol) in wps:
+                    m.add_waypoint_to_all(src, target, wp, protocol)
 
             # solve the LP
             excess = m.make_and_solve_lp()
@@ -281,7 +283,7 @@ class Controller(object):
         """Returns all the waypoint SLAs.
 
         Returns:
-            list(tuple(str, str, str, str)): The waypoit SLAs as a list of (src, target, wp, protocol) tuples
+            list(tuple(str, str, str, str)): The waypoint SLAs as a list of (src, target, wp, protocol) tuples
         """
         df = pd.read_csv(self.slas_file)
         df = df.rename(columns=lambda x: x.strip())

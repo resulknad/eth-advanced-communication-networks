@@ -1,7 +1,6 @@
 from collections import defaultdict
 from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, LpStatus, value
 from copy import deepcopy
-from collections import defaultdict
 from flow_endpoint import FlowEndpoint
 from commodity import Commodity
 
@@ -278,8 +277,6 @@ class MCF:
         edges_str = list(map(str, self.graph.edges))
         edges_capacity = {str(e): e.bw for e in self.graph.edges}
 
-        nodes_str = list(map(str, self.graph.nodes))
-
         commodities_str = list(map(str, range(len(self.commodities))))
         variables = LpVariable.dicts("Route", (edges_str, commodities_str), 0)
         cost = {
@@ -437,8 +434,6 @@ class MCF:
         # reconstruct paths out of adjencency lists for paths
         for c_id in range(len(self.commodities)):
             commodity = self.commodities[c_id]
-
-            n = commodity.source
 
             # adjacency list for commodity c
             adj = result[c_id]

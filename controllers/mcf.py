@@ -343,7 +343,6 @@ class MCF:
                 val = 0
                 if commodity.source == name:
                     val = -commodity.demand
-                    # print(outgoing_excess, incoming_excess)
                 elif commodity.target == name:
                     val = commodity.demand
 
@@ -429,8 +428,6 @@ class MCF:
 
             # as long as we have not reached end, continue
             for n, weight in adj[last_node]:
-                # print("moving from", last_node, " to ", n)
-                # print(adj[last_node])
                 paths.extend(dfs(adj, path + [n], weights + [weight]))
 
             return paths

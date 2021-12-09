@@ -7,21 +7,21 @@ class Graph:
     edges = []
     nodes = {}
 
-    def __init__(self, top_file):
+    def __init__(self, topo_file):
         """Initializes a graph using the given topo.json file
 
         Args:
-            top_file (str): json file describing the topology
+            topo_file (str): json file describing the topology
         """
         self.edges = []
         self.edges_map = {}
         self.nodes = {}
-        self._read_json(top_file)
+        self._read_json(topo_file)
 
-    def _read_json(self, top_file):
+    def _read_json(self, topo_file):
         """Reads and parses the json file. Adds the edges and nodes."""
 
-        with open(top_file) as json_file:
+        with open(topo_file) as json_file:
             data = json.load(json_file)
             for n in data["nodes"]:
                 self.add_node(n["id"], n)

@@ -3,7 +3,7 @@ from collections import defaultdict
 import threading
 import math
 import time
-from scapy.all import sniff, Ether, raw
+from scapy.all import sniff, Ether, raw, UDP, IP
 import pandas as pd
 import struct
 
@@ -453,6 +453,23 @@ class Controller(object):
                         print(f"Link recovery detected: {affected_link}", flush=True)
                         self.failed_links.remove(affected_link)
                         self.link_state_changed(list(self.failed_links))
+        elif UDP in packet and packet[UDP].sport >= 60000:
+            ip = packet[IP]
+            udp = packet[UDP]
+
+            src = str(ip.src)
+            sport = udp.sport
+            dst = str(ip.dst)
+            dport = udp.dport
+
+            # TODO handle packet indicating an additional flow
+            # Create initial MCF with base traffic averaged over entire runtime
+            # Create new MCF from residual graph with only additional traffic as commodities
+            # Solve MCF and install new paths as usual (don't delete base traffic paths)
+            # We need to somehow be able to tell if an additional path is actually new or just belongs to a flow that the MCF decided to drop
+            # Every X seconds, purge all additional traffic paths (next packet will force controller to compute again)
+            # Re-emit this packet to switch so that it doesn't get lost
+            pass
 
     def link_state_changed(self, failures):
         """Callback function that is invoked whenever a link failure or recovery is detected.

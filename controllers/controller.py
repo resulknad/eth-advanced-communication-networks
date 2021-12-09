@@ -140,6 +140,7 @@ class FlowManager:
         self.params = params
         self.filtered_slas = filtered_slas
         self._paths = {}
+        self._path_weights = {}
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(params.TOTAL_TIME / params.MCF_INTERVAL_SIZE)
@@ -160,11 +161,16 @@ class FlowManager:
 
             start_time = end_time
 
+        # Calculate base paths using base traffic and without failures
         self.compute_paths_mcf()
 
     @property
     def paths(self):
         return self._paths
+
+    @property
+    def path_weights(self):
+        return self._path_weights
 
     def compute_paths_mcf(self, failures=None):
         """Computes paths by solving a multi-commodity flow problem for each time interval, taking into account a list of failed links.
@@ -223,12 +229,13 @@ class FlowManager:
                         FlowManager.add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
 
             # add waypoints
-            wps = self._get_waypoints()
-            for (src, target, wp, protocol) in wps:
-                m.add_waypoint_to_all(src, target, wp, protocol)
+            FlowManager.add_waypoints_to_mcf(m, self._get_waypoints())
 
             # solve the LP
+            lp_st = time.time()
             excess = m.make_and_solve_lp()
+            lp_et = time.time()
+            print(f"Solving LP took {lp_et - lp_st}", flush=True)
 
             if excess > 0:
                 print(
@@ -255,9 +262,15 @@ class FlowManager:
             start_time = end_time
 
         self._paths = flows_to_path
+        self._path_weights = flows_to_path_weights
 
         et = time.time()
         print(f"Computing new paths took {et - st}", flush=True)
+
+    @staticmethod
+    def add_waypoints_to_mcf(mcf, wps):
+        for (src, target, wp, protocol) in wps:
+            mcf.add_waypoint_to_all(src, target, wp, protocol)
 
     @staticmethod
     def add_flow_to_mcf(mcf, src_fe, dst_fe, flow, interval_length):
@@ -359,11 +372,24 @@ class Controller(object):
         self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
         self.ecmp_group_counters = defaultdict(int)
 
-        filtered_slas = preprocess_slas(slas_file)
-        base_traffic = preprocess_base_traffic(base_traffic_file)
-        self.flow_manager = FlowManager(self.g, params, base_traffic, filtered_slas)
+        self.filtered_slas = preprocess_slas(slas_file)
+        self.base_traffic = preprocess_base_traffic(base_traffic_file)
+        self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
+
         self.init_controllers()
         self.init_heartbeats()
+
+    def _prepare_additional_traffic(self):
+        additional_traffic_params = deepcopy(params);
+        additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
+        additional_manager = FlowManager(self.g, additional_traffic_params, self.base_traffic, self.filtered_slas)
+        additional_manager.compute_paths_mcf()
+
+        # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
+        self.additional_traffic_graph = deepcopy(self.g)
+
+        for path, weight in zip(additional_manager.paths, additional_manager.weights):
+            self.additional_traffic_graph.subtract_path(path, weight)
 
     def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""

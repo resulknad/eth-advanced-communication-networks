@@ -63,7 +63,7 @@ control MyIngress(inout headers hdr,
                 hdr.tcp.dstPort,
                 hdr.ipv4.protocol
             },
-            (bit<14>)8192
+            (bit<14>)REGISTER_SIZE
         );
 
         // read previous time stamp

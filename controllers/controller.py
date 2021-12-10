@@ -3,8 +3,11 @@ from collections import defaultdict
 import threading
 import math
 import time
-from scapy.all import *
+from scapy.all import sniff, Ether, raw
 import pandas as pd
+import struct
+
+from typing import Dict
 
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
@@ -12,10 +15,8 @@ from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from graph import Graph
 from mcf import MCF
 from flow_endpoint import FlowEndpoint
-from heartbeat_generator import HeartBeatGenerator
+from heartbeat_generator import HeartBeatGenerator, TYPE_HEARTBEAT
 
-
-TYPE_HEARTBEAT = 0x1234
 TYPE_TCP = 0x6
 TYPE_UDP = 0x11
 TOTAL_TIME = 60  # seconds
@@ -38,11 +39,46 @@ TCP_DURATION_MULTIPLIER = 1.5
 # ============================== SLA SELECTION ===================================
 # These parameters allow to select the SLAs that should be considered.
 # They are described in more detail in tehe README.
-FILTER_SLA_MAX_PORT = 200
 FILTER_INCLUDE_SLA_BY_NAME = [
-    "prr_28"    # this basically means include UDP flows from 200-300
-]
-FILTER_INCLUDE_WAYPOINTS = True
+        "fcr_1", # 1--100 TCP 1
+        "prr_2", # 1--100 UDP 0.99
+        "fct_3", # 1--100 TCP 20
+        "fct_4", # 1--100 TCP 15
+        "fct_5", # 1--100 TCP 10
+        "delay_6", # 1--100 UDP 0.017
+        "delay_7", # 1--100 UDP 0.015
+        "delay_8", # 1--100 UDP 0.012
+        "fcr_9", # 101--200 TCP 1
+        "prr_10", # 101--200 UDP 0.99
+        "fct_11", # 101--200 TCP 20
+        "fct_12", # 101--200 TCP 15
+        "fct_13", # 101--200 TCP 10
+        "delay_14", # 101--200 UDP 0.03
+        "delay_15", # 101--200 UDP 0.025
+        "delay_16", # 101--200 UDP 0.02
+        # "fcr_17", # 201--300 TCP 1
+        # "prr_18", # 201--300 UDP 0.75
+        # "prr_19", # 201--300 UDP 0.95
+        # "prr_20", # 201--300 UDP 0.99
+        # "fct_21", # 201--300 TCP 15
+        # "fct_22", # 201--300 TCP 10
+        # "delay_23", # 201--300 UDP 0.02
+        # "delay_24", # 201--300 UDP 0.012
+        # "fcr_25", # 301--400 TCP 1
+        # "prr_26", # 301--400 UDP 0.75
+        # "prr_27", # 301--400 UDP 0.95
+        "prr_28", # 301--400 UDP 0.99
+        # "delay_29", # 301--400 UDP 0.06
+        # "delay_30", # 301--400 UDP 0.04
+        # "prr_31", # 60001--* UDP 0.75
+        # "prr_32", # 60001--* UDP 0.95
+        # "prr_33", # 60001--* UDP 0.99
+        "wp_34", # LON_h0 -> BAR_h0 udp PAR
+        "wp_35", # POR_h0 -> GLO_h0 udp PAR
+        "wp_36", # BRI_h0 -> BAR_h0 udp PAR
+        "wp_37", # BER_h0 -> LIS_h0 udp MAD
+        "wp_38", # LIS_h0 -> BER_h0 udp MAD
+        ]
 
 
 class Controller(object):
@@ -57,7 +93,7 @@ class Controller(object):
         self.slas_file = slas
         self.topo_file = "topology.json"
         self.topo = load_topo(self.topo_file)
-        self.controllers = {}  # type: Dict[str, SimpleSwitchThriftAPI]
+        self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
         self.ecmp_group_counters = defaultdict(int)
 
         self.init_mcf()
@@ -77,6 +113,7 @@ class Controller(object):
 
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
+        # Stores the end-time of each interval
         self.intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
@@ -84,7 +121,7 @@ class Controller(object):
         start_time = 0
         for end_time in self.intervals:
             flows = df[
-                (df["start_time"] <= end_time) & (df["end_time"] >= start_time)
+                (df["start_time"] < end_time) & (df["end_time"] >= start_time)
             ]
 
             self.flows_for_interval[end_time] = flows
@@ -128,35 +165,19 @@ class Controller(object):
         df = pd.read_csv(self.slas_file)
         df = df.rename(columns=lambda x: x.strip())
 
-        # -1 will be value for wildcard
-        df["sport"] = df["sport"].str.replace("*", "-1")
         sport = df["sport"].str.split("--", n=1, expand=True)
-        df["sport_start"], df["sport_end"] = sport[0].astype("int32"), sport[1].astype(
-            "int32"
-        )
+        df["sport_start"] = sport[0].replace('*', '0').astype("int32")
+        df["sport_end"] = sport[1].replace('*', '65535').astype("int32")
 
-        df["dport"] = df["dport"].str.replace("*", "-1")
         dport = df["dport"].str.split("--", n=1, expand=True)
-        df["dport_start"], df["dport_end"] = dport[0].astype("int32"), dport[1].astype(
-            "int32"
-        )
+        df["dport_start"] = dport[0].replace('*', '0').astype("int32")
+        df["dport_end"] = dport[1].replace('*', '65535').astype("int32")
 
         # select SLAs that should be considered
-        df = df[
-            (
-                (df["type"] != "wp")
-                & (
-                    (df["sport_start"] <= FILTER_SLA_MAX_PORT)
-                    & (df["sport_end"] <= FILTER_SLA_MAX_PORT)
-                    & (df["dport_start"] <= FILTER_SLA_MAX_PORT)
-                    & (df["dport_end"] <= FILTER_SLA_MAX_PORT)
-                )
-            )
-            | df["id"].isin(FILTER_INCLUDE_SLA_BY_NAME)
-        ]
+        df = df[df["id"].isin(FILTER_INCLUDE_SLA_BY_NAME)]
         self.filtered_slas = df
 
-    def _compute_paths_mcf(self, failures=[]):
+    def _compute_paths_mcf(self, failures=None):
         """Computes paths by solving a multi-commodity flow problem for each time interval, taking into account a list of failed links.
         The paths are stored as an attribute.
         Note: self.init_mcf() should have been called once beforehand.
@@ -164,6 +185,10 @@ class Controller(object):
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
         """
+        st = time.time()
+
+        if failures is None:
+            failures = []
 
         flows_to_path = defaultdict(list)
         flows_to_path_weights = defaultdict(list)
@@ -179,7 +204,7 @@ class Controller(object):
 
             interval_length = end_time - start_time
 
-            for (i, f) in flows.iterrows():
+            for (_, f) in flows.iterrows():
                 if self._slas_for_flow(
                     f["src"], f["sport"], f["dst"], f["dport"], f["protocol"]
                 ):
@@ -209,10 +234,9 @@ class Controller(object):
                         self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
 
             # add waypoints
-            if FILTER_INCLUDE_WAYPOINTS:
-                wps = self._get_waypoints()
-                for (src, target, wp, protocol) in wps:
-                    m.add_waypoint_to_all(src, target, wp, protocol)
+            wps = self._get_waypoints()
+            for (src, target, wp, protocol) in wps:
+                m.add_waypoint_to_all(src, target, wp, protocol)
 
             # solve the LP
             excess = m.make_and_solve_lp()
@@ -247,8 +271,13 @@ class Controller(object):
 
         self.paths = flows_to_path
 
+        et = time.time()
+        print(f"Computing new paths took {et - st}", flush=True)
+
     def _slas_for_flow(self, from_host, from_port, to_host, to_port, protocol):
         """Returns all SLAs that apply to a given flow.
+
+        This does not include the waypoint SLAs.
 
         Args:
             from_host (str): The src host of the flow
@@ -261,18 +290,15 @@ class Controller(object):
             list(pandas.Series): The SLAs that apply to the given flow
         """
         relevant_slas = []
-        for (indx, sla) in self.filtered_slas.iterrows():
+        for (_, sla) in self.filtered_slas.iterrows():
             src_match = sla.src == "*" or sla.src == from_host
-            src_port_match = (sla.sport_start <= from_port) and (
-                sla.sport_end == -1 or sla.sport_end >= from_port
-            )
+            src_port_match = sla.sport_start <= from_port <= sla.sport_end
             dst_match = sla.dst == "*" or sla.dst == to_host
-            dst_port_match = (sla.dport_start <= to_port) and (
-                sla.dport_end == -1 or sla.dport_end >= to_port
-            )
+            dst_port_match = sla.dport_start <= to_port <= sla.dport_end
 
             if (
-                src_match
+                sla.type != "wp"
+                and src_match
                 and src_port_match
                 and dst_match
                 and dst_port_match
@@ -282,13 +308,12 @@ class Controller(object):
         return relevant_slas
 
     def _get_waypoints(self):
-        """Returns all the waypoint SLAs.
+        """Returns the waypoint SLAs from the filtered SLAs
 
         Returns:
             list(tuple(str, str, str, str)): The waypoint SLAs as a list of (src, target, wp, protocol) tuples
         """
-        df = pd.read_csv(self.slas_file)
-        df = df.rename(columns=lambda x: x.strip())
+        df = self.filtered_slas
 
         wps = df[df["type"] == "wp"]
         return wps[["src", "dst", "target", "protocol"]].values.tolist()
@@ -436,6 +461,7 @@ class Controller(object):
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
         """
+
         print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
         print("Recomputing MCF solution")
@@ -567,7 +593,7 @@ class Controller(object):
                 print(path, path_wo_hosts)
                 labels = self._get_mpls_stack(path_wo_hosts)
                 print(labels)
-                num_hops = len(path_wo_hosts) - 1
+                num_hops = len(labels)
                 action_name = f"mpls_ingress_{num_hops}_hop"
                 action_args = list(map(str, labels[::-1]))
 

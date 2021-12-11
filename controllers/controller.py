@@ -6,10 +6,11 @@ import time
 from scapy.all import sniff, Ether, raw, UDP, IP
 import pandas as pd
 import struct
+from dataclasses import dataclass
 
 from copy import deepcopy
 
-from typing import Dict
+from typing import Dict, List
 
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
@@ -39,6 +40,7 @@ params = Parameter(
         TCP_ACK_BW_MULTIPLIER = 0.5,
         HEARTBEAT_FREQUENCY = 0.1,
         TCP_DURATION_MULTIPLIER = 1.5,
+        ADDITIONAL_BW = 10,
         SLAS = [
             "fcr_1", # 1--100 TCP 1
             "prr_2", # 1--100 UDP 0.99
@@ -81,6 +83,39 @@ params = Parameter(
             ]
         )
 
+@dataclass
+class Flow:
+    src: str
+    sport: int
+    dst: str
+    dport: int
+    protocol: str
+    rate: float
+    start_time: float = -1
+    end_time: float = -1
+
+    @staticmethod
+    def from_df(df):
+        res = []
+        for (_, f) in df.iterrows():
+            res.append(Flow(f["src"], int(f["sport"]), f["dst"], int(f["dport"]), f["protocol"], float(f["rate"][:-4]), float(f["start_time"]), float(f["end_time"])))
+        return res
+
+    def to_source_endpoint(self) -> FlowEndpoint:
+        return FlowEndpoint(host=self.src, port=self.sport, protocol=self.protocol)
+
+    def to_dest_endpoint(self) -> FlowEndpoint:
+        return FlowEndpoint(host=self.dst, port=self.dport, protocol=self.protocol)
+
+    def is_tcp(self) -> bool:
+        return self.protocol == "tcp"
+
+    def is_udp(self) -> bool:
+        return self.protocol == "udp"
+
+    def duration(self) -> float:
+        return self.end_time - self.start_time
+
 def preprocess_slas(slas_file):
     """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
     out the SLAs that should not be considered. The remaining SLAs (to be considered) are stored as a DataFrame attribute.
@@ -116,7 +151,7 @@ def preprocess_base_traffic(base_traffic_file):
         slas_file (str): Path to the base traffic csv file
 
     Returns:
-        pandas.DataFrame: a DataFrame containing the transformed base traffic
+        List[Flow]: List of flows representing the base traffic
     """
     # read base traffic
     df = pd.read_csv(base_traffic_file)
@@ -131,10 +166,10 @@ def preprocess_base_traffic(base_traffic_file):
 
     # add end_time everywhere
     df["end_time"] = df["start_time"] + df["duration"]
-    return df
+    return Flow.from_df(df)
 
 class FlowManager:
-    def __init__(self, graph: Graph, params: Parameter, base_traffic, filtered_slas):
+    def __init__(self, graph: Graph, params: Parameter, base_traffic : List[Flow], filtered_slas):
         # read topology
         self.g = deepcopy(graph)
         self.params = params
@@ -148,16 +183,14 @@ class FlowManager:
         self.intervals = [params.MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
-        self.flows_for_interval = {}
+        self.flows_for_interval : Dict[int, List[Flow]] = {}
         start_time = 0
         for end_time in self.intervals:
-            flows = base_traffic[
-                (base_traffic["start_time"] < end_time) & (base_traffic["end_time"] >= start_time)
-            ]
+            flows = [f for f in base_traffic if (f.start_time < end_time) and (f.end_time >= start_time)]
 
             self.flows_for_interval[end_time] = flows
 
-            print("[{}, {}] {} flows".format(start_time, end_time, flows.shape[0]))
+            print("[{}, {}] {} flows".format(start_time, end_time, len(flows)))
 
             start_time = end_time
 
@@ -199,16 +232,11 @@ class FlowManager:
 
             interval_length = end_time - start_time
 
-            for (_, f) in flows.iterrows():
-                if self._slas_for_flow(
-                    f["src"], f["sport"], f["dst"], f["dport"], f["protocol"]
-                ):
-                    src_fe = FlowEndpoint(
-                        host=f["src"], port=f["sport"], protocol=f["protocol"]
-                    )
-                    dst_fe = FlowEndpoint(
-                        host=f["dst"], port=f["dport"], protocol=f["protocol"]
-                    )
+            f: Flow
+            for f in flows:
+                if self._slas_for_flow(f):
+                    src_fe = f.to_source_endpoint()
+                    dst_fe = f.to_dest_endpoint()
 
                     if (src_fe, dst_fe) in flows_to_path:
                         # flow was already considered in previous timestep
@@ -219,14 +247,14 @@ class FlowManager:
                         )
 
                         # for TCP flows, we also keep the reverse path for the ACKs
-                        if f["protocol"] == "tcp":
+                        if f.is_tcp():
                             m.subtract_paths(
                                 flows_to_path[(dst_fe, src_fe)],
                                 flows_to_path_weights[(dst_fe, src_fe)],
                             )
                     else:
                         # find path for that new flow
-                        FlowManager.add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
+                        FlowManager.add_flow_to_mcf(m, f, interval_length)
 
             # add waypoints
             FlowManager.add_waypoints_to_mcf(m, self._get_waypoints())
@@ -258,7 +286,7 @@ class FlowManager:
                     )
                 flows_to_path[(src, dst)].extend(paths[(src, dst)])
                 flows_to_path_weights[(src, dst)].extend(weights[(src, dst)])
-            print("[{}, {}] {} flows ({} new paths, {} saved)".format(start_time, end_time, flows.shape[0], len(paths), len(flows_to_path)))
+            print("[{}, {}] {} flows ({} new paths, {} saved)".format(start_time, end_time, len(flows), len(paths), len(flows_to_path)))
             start_time = end_time
 
         self._paths = flows_to_path
@@ -273,28 +301,29 @@ class FlowManager:
             mcf.add_waypoint_to_all(src, target, wp, protocol)
 
     @staticmethod
-    def add_flow_to_mcf(mcf, src_fe, dst_fe, flow, interval_length):
+    def add_flow_to_mcf(mcf, flow, interval_length):
         """Adds a flow to the given MCF problem. Cost and bandwidth are adjusted depending on tunable parameters.
         For TCP flows, an additional reverse flow is added to allow ACKs to be delivered.
 
         Args:
             mcf (MCF): The MCF problem instance
-            src_fe (FlowEndpoint): The src flow endpoint
-            dst_fe (FlowEndpoint): The dst flow endpoint
-            flow (pandas.Series): The row in the traffic DataFrame corresponding to the flow
+            flow (Flow)
             interval_length (float): The size of the current interval (where the flow should be added), in seconds
         """
 
         cost_multiplier = (
-            params.UDP_COST_MULTIPLIER if flow["protocol"] == "udp" else params.TCP_COST_MULTIPLIER
+            params.UDP_COST_MULTIPLIER if flow.is_udp() else params.TCP_COST_MULTIPLIER
         )
         bw_multiplier = (
-            params.UDP_BW_MULTIPLIER if flow["protocol"] == "udp" else params.TCP_BW_MULTIPLIER
+            params.UDP_BW_MULTIPLIER if flow.is_udp() else params.TCP_BW_MULTIPLIER
         )
 
-        bw = float(flow["rate"][:-4]) * bw_multiplier
+        bw = flow.rate * bw_multiplier
         if params.NORMALIZE_BW_ACROSS_TIME:
-            bw *= (flow["end_time"] - flow["start_time"]) / interval_length
+            bw *= flow.duration() / interval_length
+
+        src_fe = flow.to_source_endpoint()
+        dst_fe = flow.to_dest_endpoint()
 
         mcf.add_flow(
             src_fe,
@@ -305,7 +334,7 @@ class FlowManager:
         )
 
         # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
-        if flow["protocol"] == "tcp":
+        if flow.is_tcp():
             mcf.add_flow(
                 dst_fe,
                 src_fe,
@@ -313,21 +342,24 @@ class FlowManager:
                 add_on_conflict=params.NORMALIZE_BW_ACROSS_TIME,
             )
 
-    def _slas_for_flow(self, from_host, from_port, to_host, to_port, protocol):
+    def _slas_for_flow(self, flow):
         """Returns all SLAs that apply to a given flow.
 
         This does not include the waypoint SLAs.
 
         Args:
-            from_host (str): The src host of the flow
-            from_port (str): The src port of the flow
-            to_host (str): The dst host of the flow
-            to_port (str): The dst port of the flow
-            protocol (str): The protocol of the flow
+            flow (Flow)
 
         Returns:
             list(pandas.Series): The SLAs that apply to the given flow
         """
+        
+        from_host = flow.src
+        from_port = flow.sport
+        to_host = flow.dst
+        to_port = flow.dport
+        protocol = flow.protocol
+
         relevant_slas = []
         for (_, sla) in self.filtered_slas.iterrows():
             src_match = sla.src == "*" or sla.src == from_host
@@ -372,23 +404,28 @@ class Controller(object):
         self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
         self.ecmp_group_counters = defaultdict(int)
 
+        self.additional_udp : List[Flow] = []
+
         self.filtered_slas = preprocess_slas(slas_file)
         self.base_traffic = preprocess_base_traffic(base_traffic_file)
         self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
 
+        self._prepare_additional_traffic()
         self.init_controllers()
         self.init_heartbeats()
 
     def _prepare_additional_traffic(self):
-        additional_traffic_params = deepcopy(params);
-        additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
-        additional_manager = FlowManager(self.g, additional_traffic_params, self.base_traffic, self.filtered_slas)
+        self.additional_traffic_params = deepcopy(params);
+        self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
+        additional_manager = FlowManager(self.g, self.additional_traffic_params, self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
+        # For the flow computations for the additional traffic, we don't want to normalize
+        self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = False
 
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
 
-        for path, weight in zip(additional_manager.paths, additional_manager.weights):
+        for path, weight in zip(*additional_manager.paths.values(), *additional_manager.path_weights.values()):
             self.additional_traffic_graph.subtract_path(path, weight)
 
     def init_controllers(self):
@@ -494,6 +531,25 @@ class Controller(object):
             sport = udp.sport
             dst = str(ip.dst)
             dport = udp.dport
+
+            # TODO use actual time values (also add option to set default length of additional traffic)
+            flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
+
+            if flow in self.additional_udp:
+                # TODO maybe log an error or push the packet to the egress
+                # This shouldn't happen since after the first additional
+                # traffic packet is received, a new route should be installed
+                # for it in the switch.
+                return
+
+            self.additional_udp.append(flow)
+
+            manager = FlowManager(self.g, self.additional_traffic_params, self.additional_udp, self.filtered_slas)
+            manager.compute_paths_mcf()
+
+            # TODO install paths
+            # TODO install drop actions for rejected flows
+            
 
             # TODO handle packet indicating an additional flow
             # Create initial MCF with base traffic averaged over entire runtime

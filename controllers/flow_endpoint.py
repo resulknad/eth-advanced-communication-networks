@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class FlowEndpoint:
     host: str
     port: int
-    protocol: int
+    protocol: str
 
     def __repr__(self):
         return "{}:{}:{}".format(self.host, self.port, self.protocol)

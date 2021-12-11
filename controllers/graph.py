@@ -104,7 +104,7 @@ class Graph:
         to stdout if an edge has less than weight bandwidth / capacity left.
 
         Args:
-            path (list(string)): list of nodestrings
+            path (list(str)): list of nodestrings
             weight (float): weight of the path
 
         Returns:

@@ -15,4 +15,5 @@ class Parameter:
     TCP_ACK_BW_MULTIPLIER: float
     HEARTBEAT_FREQUENCY: float # seconds
     TCP_DURATION_MULTIPLIER: float
+    ADDITIONAL_BW: float # Mbps
     SLAS: List[str]

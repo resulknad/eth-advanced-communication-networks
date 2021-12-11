@@ -1238,9 +1238,9 @@ control MyIngress(inout headers hdr,
             } else if (!ipv4_lpm.apply().hit) {
                 // This is additional traffic that does not yet have a path allocated
                 // We send it to the controller so that it can set up paths.
-                if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) {
-                    clone3(CloneType.I2E, 100, meta);
-                }
+                /* if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) { */
+                /*     clone3(CloneType.I2E, 100, meta); */
+                /* } */
                 drop();
             }
 

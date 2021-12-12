@@ -38,33 +38,33 @@ TCP_DURATION_MULTIPLIER = 1.5
 
 # ============================== SLA SELECTION ===================================
 # These parameters allow to select the SLAs that should be considered.
-# They are described in more detail in tehe README.
+# They are described in more detail in the README.
 FILTER_INCLUDE_SLA_BY_NAME = [
         "fcr_1", # 1--100 TCP 1
-        "prr_2", # 1--100 UDP 0.99
+        # "prr_2", # 1--100 UDP 0.99
         "fct_3", # 1--100 TCP 20
         "fct_4", # 1--100 TCP 15
         "fct_5", # 1--100 TCP 10
-        "delay_6", # 1--100 UDP 0.017
-        "delay_7", # 1--100 UDP 0.015
-        "delay_8", # 1--100 UDP 0.012
+        # "delay_6", # 1--100 UDP 0.017
+        # "delay_7", # 1--100 UDP 0.015
+        # "delay_8", # 1--100 UDP 0.012
         "fcr_9", # 101--200 TCP 1
-        "prr_10", # 101--200 UDP 0.99
+        # "prr_10", # 101--200 UDP 0.99
         "fct_11", # 101--200 TCP 20
         "fct_12", # 101--200 TCP 15
         "fct_13", # 101--200 TCP 10
-        "delay_14", # 101--200 UDP 0.03
-        "delay_15", # 101--200 UDP 0.025
-        "delay_16", # 101--200 UDP 0.02
-        # "fcr_17", # 201--300 TCP 1
+        # "delay_14", # 101--200 UDP 0.03
+        # "delay_15", # 101--200 UDP 0.025
+        # "delay_16", # 101--200 UDP 0.02
+        "fcr_17", # 201--300 TCP 1
         # "prr_18", # 201--300 UDP 0.75
         # "prr_19", # 201--300 UDP 0.95
         # "prr_20", # 201--300 UDP 0.99
-        # "fct_21", # 201--300 TCP 15
-        # "fct_22", # 201--300 TCP 10
+        "fct_21", # 201--300 TCP 15
+        "fct_22", # 201--300 TCP 10
         # "delay_23", # 201--300 UDP 0.02
         # "delay_24", # 201--300 UDP 0.012
-        # "fcr_25", # 301--400 TCP 1
+        "fcr_25", # 301--400 TCP 1
         # "prr_26", # 301--400 UDP 0.75
         # "prr_27", # 301--400 UDP 0.95
         "prr_28", # 301--400 UDP 0.99
@@ -73,7 +73,7 @@ FILTER_INCLUDE_SLA_BY_NAME = [
         # "prr_31", # 60001--* UDP 0.75
         # "prr_32", # 60001--* UDP 0.95
         # "prr_33", # 60001--* UDP 0.99
-        "wp_34", # LON_h0 -> BAR_h0 udp PAR
+        # "wp_34", # LON_h0 -> BAR_h0 udp PAR
         "wp_35", # POR_h0 -> GLO_h0 udp PAR
         "wp_36", # BRI_h0 -> BAR_h0 udp PAR
         "wp_37", # BER_h0 -> LIS_h0 udp MAD

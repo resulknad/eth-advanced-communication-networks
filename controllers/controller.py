@@ -28,7 +28,7 @@ from parameters import Parameter
 TYPE_TCP = 0x6
 TYPE_UDP = 0x11
 TYPE_IPV4 = 0x800
-TYPE_MPLS = 0x8847;
+TYPE_MPLS = 0x8847
 
 load_contrib('mpls')
 
@@ -37,59 +37,59 @@ load_contrib('mpls')
 # The parameters are described in detail in the README.
 
 params = Parameter(
-        TOTAL_TIME = 60,
-        MCF_INTERVAL_SIZE = 5,
-        NORMALIZE_BW_ACROSS_TIME = False,
-        TCP_DEFAULT_BW = 10,
-        UDP_COST_MULTIPLIER = 1,
-        TCP_COST_MULTIPLIER = 1,
-        UDP_BW_MULTIPLIER = 1,
-        TCP_BW_MULTIPLIER = 1,
-        TCP_ACK_BW_MULTIPLIER = 0.5,
-        HEARTBEAT_FREQUENCY = 0.1,
-        TCP_DURATION_MULTIPLIER = 1.5,
-        ADDITIONAL_BW = 10,
-        SLAS = [
-            "fcr_1", # 1--100 TCP 1
-            "prr_2", # 1--100 UDP 0.99
-            "fct_3", # 1--100 TCP 20
-            "fct_4", # 1--100 TCP 15
-            "fct_5", # 1--100 TCP 10
-            "delay_6", # 1--100 UDP 0.017
-            "delay_7", # 1--100 UDP 0.015
-            "delay_8", # 1--100 UDP 0.012
-            "fcr_9", # 101--200 TCP 1
-            "prr_10", # 101--200 UDP 0.99
-            "fct_11", # 101--200 TCP 20
-            "fct_12", # 101--200 TCP 15
-            "fct_13", # 101--200 TCP 10
-            "delay_14", # 101--200 UDP 0.03
-            "delay_15", # 101--200 UDP 0.025
-            "delay_16", # 101--200 UDP 0.02
-            # "fcr_17", # 201--300 TCP 1
-            # "prr_18", # 201--300 UDP 0.75
-            # "prr_19", # 201--300 UDP 0.95
-            # "prr_20", # 201--300 UDP 0.99
-            # "fct_21", # 201--300 TCP 15
-            # "fct_22", # 201--300 TCP 10
-            # "delay_23", # 201--300 UDP 0.02
-            # "delay_24", # 201--300 UDP 0.012
-            # "fcr_25", # 301--400 TCP 1
-            # "prr_26", # 301--400 UDP 0.75
-            # "prr_27", # 301--400 UDP 0.95
-            "prr_28", # 301--400 UDP 0.99
-            # "delay_29", # 301--400 UDP 0.06
-            # "delay_30", # 301--400 UDP 0.04
-            "prr_31", # 60001--* UDP 0.75
-            "prr_32", # 60001--* UDP 0.95
-            "prr_33", # 60001--* UDP 0.99
-            "wp_34", # LON_h0 -> BAR_h0 udp PAR
-            "wp_35", # POR_h0 -> GLO_h0 udp PAR
-            "wp_36", # BRI_h0 -> BAR_h0 udp PAR
-            "wp_37", # BER_h0 -> LIS_h0 udp MAD
-            "wp_38", # LIS_h0 -> BER_h0 udp MAD
-            ]
-        )
+    TOTAL_TIME=60,
+    MCF_INTERVAL_SIZE=5,
+    NORMALIZE_BW_ACROSS_TIME=False,
+    TCP_DEFAULT_BW=10,
+    UDP_COST_MULTIPLIER=1,
+    TCP_COST_MULTIPLIER=1,
+    UDP_BW_MULTIPLIER=1,
+    TCP_BW_MULTIPLIER=1,
+    TCP_ACK_BW_MULTIPLIER=0.5,
+    HEARTBEAT_FREQUENCY=0.1,
+    TCP_DURATION_MULTIPLIER=1.5,
+    ADDITIONAL_BW=10,
+    SLAS=[
+        "fcr_1", # 1--100 TCP 1
+        "prr_2", # 1--100 UDP 0.99
+        "fct_3", # 1--100 TCP 20
+        "fct_4", # 1--100 TCP 15
+        "fct_5", # 1--100 TCP 10
+        "delay_6", # 1--100 UDP 0.017
+        "delay_7", # 1--100 UDP 0.015
+        "delay_8", # 1--100 UDP 0.012
+        "fcr_9", # 101--200 TCP 1
+        "prr_10", # 101--200 UDP 0.99
+        "fct_11", # 101--200 TCP 20
+        "fct_12", # 101--200 TCP 15
+        "fct_13", # 101--200 TCP 10
+        "delay_14", # 101--200 UDP 0.03
+        "delay_15", # 101--200 UDP 0.025
+        "delay_16", # 101--200 UDP 0.02
+        # "fcr_17", # 201--300 TCP 1
+        # "prr_18", # 201--300 UDP 0.75
+        # "prr_19", # 201--300 UDP 0.95
+        # "prr_20", # 201--300 UDP 0.99
+        # "fct_21", # 201--300 TCP 15
+        # "fct_22", # 201--300 TCP 10
+        # "delay_23", # 201--300 UDP 0.02
+        # "delay_24", # 201--300 UDP 0.012
+        # "fcr_25", # 301--400 TCP 1
+        # "prr_26", # 301--400 UDP 0.75
+        # "prr_27", # 301--400 UDP 0.95
+        "prr_28", # 301--400 UDP 0.99
+        # "delay_29", # 301--400 UDP 0.06
+        # "delay_30", # 301--400 UDP 0.04
+        "prr_31", # 60001--* UDP 0.75
+        "prr_32", # 60001--* UDP 0.95
+        "prr_33", # 60001--* UDP 0.99
+        "wp_34", # LON_h0 -> BAR_h0 udp PAR
+        "wp_35", # POR_h0 -> GLO_h0 udp PAR
+        "wp_36", # BRI_h0 -> BAR_h0 udp PAR
+        "wp_37", # BER_h0 -> LIS_h0 udp MAD
+        "wp_38", # LIS_h0 -> BER_h0 udp MAD
+    ])
+
 
 @dataclass
 class Flow:
@@ -106,7 +106,9 @@ class Flow:
     def from_df(df):
         res = []
         for (_, f) in df.iterrows():
-            res.append(Flow(f["src"], int(f["sport"]), f["dst"], int(f["dport"]), f["protocol"], float(f["rate"][:-4]), float(f["start_time"]), float(f["end_time"])))
+            res.append(
+                Flow(f["src"], int(f["sport"]), f["dst"], int(f["dport"]), f["protocol"], float(f["rate"][:-4]),
+                     float(f["start_time"]), float(f["end_time"])))
         return res
 
     def to_source_endpoint(self) -> FlowEndpoint:
@@ -123,6 +125,7 @@ class Flow:
 
     def duration(self) -> float:
         return self.end_time - self.start_time
+
 
 def preprocess_slas(slas_file):
     """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
@@ -152,6 +155,7 @@ def preprocess_slas(slas_file):
 
     return df
 
+
 def preprocess_base_traffic(base_traffic_file):
     """Reads the base traffic file and transforms size-based (TCP) flows to bandwidth/duration-based flows.
 
@@ -176,8 +180,9 @@ def preprocess_base_traffic(base_traffic_file):
     df["end_time"] = df["start_time"] + df["duration"]
     return Flow.from_df(df)
 
+
 class FlowManager:
-    def __init__(self, graph: Graph, params: Parameter, base_traffic : List[Flow], filtered_slas):
+    def __init__(self, graph: Graph, params: Parameter, base_traffic: List[Flow], filtered_slas):
         # read topology
         self.g = deepcopy(graph)
         self.params = params
@@ -191,7 +196,7 @@ class FlowManager:
         self.intervals = [params.MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
-        self.flows_for_interval : Dict[int, List[Flow]] = {}
+        self.flows_for_interval: Dict[int, List[Flow]] = {}
         start_time = 0
         for end_time in self.intervals:
             flows = [f for f in base_traffic if (f.start_time < end_time) and (f.end_time >= start_time)]
@@ -274,11 +279,7 @@ class FlowManager:
             print(f"Solving LP took {lp_et - lp_st}", flush=True)
 
             if excess > 0:
-                print(
-                    "WARNING: could not satisfy all of the LP constraints! (excess: {})".format(
-                        excess
-                    )
-                )
+                print("WARNING: could not satisfy all of the LP constraints! (excess: {})".format(excess))
             m.print_paths_summary()
 
             paths, weights = m.get_paths_and_weights()
@@ -294,7 +295,8 @@ class FlowManager:
                     )
                 flows_to_path[(src, dst)].extend(paths[(src, dst)])
                 flows_to_path_weights[(src, dst)].extend(weights[(src, dst)])
-            print("[{}, {}] {} flows ({} new paths, {} saved)".format(start_time, end_time, len(flows), len(paths), len(flows_to_path)))
+            print("[{}, {}] {} flows ({} new paths, {} saved)".format(start_time, end_time, len(flows), len(paths),
+                                                                      len(flows_to_path)))
             start_time = end_time
 
         self._paths = flows_to_path
@@ -319,12 +321,8 @@ class FlowManager:
             interval_length (float): The size of the current interval (where the flow should be added), in seconds
         """
 
-        cost_multiplier = (
-            params.UDP_COST_MULTIPLIER if flow.is_udp() else params.TCP_COST_MULTIPLIER
-        )
-        bw_multiplier = (
-            params.UDP_BW_MULTIPLIER if flow.is_udp() else params.TCP_BW_MULTIPLIER
-        )
+        cost_multiplier = (params.UDP_COST_MULTIPLIER if flow.is_udp() else params.TCP_COST_MULTIPLIER)
+        bw_multiplier = (params.UDP_BW_MULTIPLIER if flow.is_udp() else params.TCP_BW_MULTIPLIER)
 
         bw = flow.rate * bw_multiplier
         if params.NORMALIZE_BW_ACROSS_TIME:
@@ -361,7 +359,7 @@ class FlowManager:
         Returns:
             list(pandas.Series): The SLAs that apply to the given flow
         """
-        
+
         from_host = flow.src
         from_port = flow.sport
         to_host = flow.dst
@@ -375,14 +373,8 @@ class FlowManager:
             dst_match = sla.dst == "*" or sla.dst == to_host
             dst_port_match = sla.dport_start <= to_port <= sla.dport_end
 
-            if (
-                sla.type != "wp"
-                and src_match
-                and src_port_match
-                and dst_match
-                and dst_port_match
-                and sla.protocol == protocol
-            ):
+            if (sla.type != "wp" and src_match and src_port_match and dst_match and dst_port_match
+                    and sla.protocol == protocol):
                 relevant_slas.append(sla)
         return relevant_slas
 
@@ -397,15 +389,16 @@ class FlowManager:
         wps = df[df["type"] == "wp"]
         return wps[["src", "dst", "target", "protocol"]].values.tolist()
 
+
 # A collection of paths is a mapping from the two endpoints to all paths from
 # the first to the second. The paths per endpoint-tuple are a list of lists,
 # the inner lists contain the name of the switches on the path in order.
 Paths = Dict[Tuple[FlowEndpoint, FlowEndpoint], List[List[str]]]
 
+
 class PathManager:
     """Maintains virtual circuits on the switches."""
-
-    def __init__(self, topo : NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
+    def __init__(self, topo: NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
         self.topo = topo
         self.controllers = controllers
 
@@ -413,7 +406,7 @@ class PathManager:
         self.ecmp_group_counters = defaultdict(int)
 
         # Currently installed paths
-        self.current_paths : Paths = {}
+        self.current_paths: Paths = {}
 
         # Store different categories of paths. All paths in this dictionary
         # will be pushed onto the switch on a triggered update.
@@ -558,6 +551,7 @@ class PathManager:
 
         return stack
 
+
 class Controller(object):
     def __init__(self, base_traffic_file, slas_file):
         """Initializes a new controller instance and performs some setup tasks.
@@ -570,9 +564,9 @@ class Controller(object):
         # read topology
         self.topo = load_topo(topo_file)
         self.g = Graph(topo_file)
-        self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
+        self.controllers: Dict[str, SimpleSwitchThriftAPI] = {}
 
-        self.additional_udp : List[Flow] = []
+        self.additional_udp: List[Flow] = []
 
         self.filtered_slas = preprocess_slas(slas_file)
         self.base_traffic = preprocess_base_traffic(base_traffic_file)
@@ -584,7 +578,7 @@ class Controller(object):
         self.init_heartbeats()
 
     def _prepare_additional_traffic(self):
-        self.additional_traffic_params = deepcopy(params);
+        self.additional_traffic_params = deepcopy(params)
         self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
         additional_manager = FlowManager(self.g, self.additional_traffic_params, self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
@@ -641,8 +635,7 @@ class Controller(object):
     def _sniff_cpu_ports(self):
         """Sniffs traffic coming from switches"""
         cpu_interfaces = [
-            str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1"))
-            for sw_name in self.controllers
+            str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers
         ]
         sniff(iface=cpu_interfaces, prn=self._process_packet)
 
@@ -706,13 +699,15 @@ class Controller(object):
             flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
 
             # TODO properly handle empty paths for a flow (install drop action)
-            # Manually create the correct MPLS stack and forward the packet
+            # this is needed because if an additional flow is rejected, we don't want to constantly get packets sent to the controller.
+
             src_fe = flow.to_source_endpoint()
             dst_fe = flow.to_dest_endpoint()
 
             paths = self.paths_manager.get_additional_traffic()[(src_fe, dst_fe)]
             num_paths = len(paths)
 
+            # Manually create the correct MPLS stack and forward the packet
             if num_paths > 0:
                 chosen = paths[random.randrange(num_paths)]
                 labels = self.paths_manager._get_mpls_stack(chosen)
@@ -731,8 +726,10 @@ class Controller(object):
 
                 out[Ether].type = TYPE_MPLS if labels else TYPE_IPV4
 
-                out[Ether].src = self.topo.node_to_node_mac(switch_name, self.topo.port_to_node(switch_name, next_hop + 1))
-                out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1), switch_name)
+                out[Ether].src = self.topo.node_to_node_mac(switch_name,
+                                                            self.topo.port_to_node(switch_name, next_hop + 1))
+                out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1),
+                                                            switch_name)
 
                 out_bytes = raw(out)
 
@@ -755,7 +752,6 @@ class Controller(object):
 
             # TODO install paths
             # TODO install drop actions for rejected flows
-            
 
             # TODO handle packet indicating an additional flow
             # Create initial MCF with base traffic averaged over entire runtime
@@ -816,9 +812,7 @@ class Controller(object):
                 port_num = self.topo.node_to_node_port_num(sw_name, neighbor)
                 neighbor_mac = self.topo.node_to_node_mac(neighbor, sw_name)
 
-                print(
-                    f"iface for {sw_name}: port_num: {port_num}, neighbor: {neighbor}, neighbor_mac: {neighbor_mac}"
-                )
+                print(f"iface for {sw_name}: port_num: {port_num}, neighbor: {neighbor}, neighbor_mac: {neighbor_mac}")
 
                 # add rule
                 print(f"table_add at {sw_name}")
@@ -849,9 +843,7 @@ def get_args():
         required=False,
         default="",
     )
-    parser.add_argument(
-        "--slas", help="Path to scenario.slas", type=str, required=False, default=""
-    )
+    parser.add_argument("--slas", help="Path to scenario.slas", type=str, required=False, default="")
     return parser.parse_args()
 
 

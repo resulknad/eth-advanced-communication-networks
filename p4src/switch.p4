@@ -141,6 +141,7 @@ control MyIngress(inout headers hdr,
         actions = {
             ecmp_group;
             no_action;
+            drop;
         }
         default_action = no_action;
         size = 256;

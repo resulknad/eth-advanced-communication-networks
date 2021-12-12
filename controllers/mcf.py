@@ -446,9 +446,13 @@ class MCF:
             all_paths[(commodity.source, commodity.target, c_id)] = []
             path_weights[(commodity.source, commodity.target, c_id)] = []
 
-            for p, weight in paths:
-                all_paths[(commodity.source, commodity.target, c_id)].append(p)
-                path_weights[(commodity.source, commodity.target, c_id)].append(weight)
+            if paths:
+                for p, weight in paths:
+                    all_paths[(commodity.source, commodity.target, c_id)].append(p)
+                    path_weights[(commodity.source, commodity.target, c_id)].append(weight)
+            else:
+                all_paths[(commodity.source, commodity.target, c_id)] = []
+                path_weights[(commodity.source, commodity.target, c_id)] = []
 
         self.paths = {}
         self.paths_weights = {}

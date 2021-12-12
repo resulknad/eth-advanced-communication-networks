@@ -778,9 +778,17 @@ class Controller(object):
 
     def run(self):
         """Run function"""
+        threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
         self.paths_manager.replace_base_paths(self.flow_manager.paths)
         self.paths_manager.trigger_update()
+
+    def reset_thread(self):
+        while True:
+            time.sleep(5)
+            self.additional_udp = []
+            self.paths_manager.replace_additional_traffic({})
+            self.paths_manager.trigger_update()
 
     def install_base_table_entries(self):
         """Installs the table entries for basic forwarding operations, namely for forwarding to directly connected hosts

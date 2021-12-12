@@ -744,14 +744,11 @@ class Controller(object):
 
             self.additional_udp.append(flow)
 
-            manager = FlowManager(self.g, self.additional_traffic_params, self.additional_udp, self.filtered_slas)
-            manager.compute_paths_mcf()
+            manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params, self.additional_udp, self.filtered_slas)
+            manager.compute_paths_mcf(list(self.failed_links))
 
             self.paths_manager.replace_additional_traffic(manager.paths)
             self.paths_manager.trigger_update()
-
-            # TODO install paths
-            # TODO install drop actions for rejected flows
 
             # TODO handle packet indicating an additional flow
             # Create initial MCF with base traffic averaged over entire runtime

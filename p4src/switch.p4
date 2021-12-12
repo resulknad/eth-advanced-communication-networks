@@ -14,6 +14,10 @@
 
 #define FAILURE_THRESHOLD 48w500000 // 0.5s # WARNING: must be bigger than heartbeat frequency.
 
+#ifndef DO_ADDITIONAL
+#define DO_ADDITIONAL 1
+#endif
+
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -1236,12 +1240,14 @@ control MyIngress(inout headers hdr,
             if (virtual_circuit.apply().hit) {
                 virtual_circuit_path.apply();
             } else if (!ipv4_lpm.apply().hit) {
+                #if DO_ADDITIONAL
                 // This is additional traffic that does not yet have a path allocated
                 // We send it to the controller so that it can set up paths.
-                /* if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) { */
-                /*     clone3(CloneType.I2E, 100, meta); */
-                /* } */
+                if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) {
+                    clone3(CloneType.I2E, 100, meta);
+                }
                 drop();
+                #endif
             }
 
         }

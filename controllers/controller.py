@@ -3,17 +3,21 @@ from collections import defaultdict
 import threading
 import math
 import time
-from scapy.all import sniff, Ether, raw, UDP, IP
+from scapy.all import sniff, Ether, raw, UDP, IP, load_contrib
 import pandas as pd
 import struct
 from dataclasses import dataclass
+import random
+
+import socket
 
 from copy import deepcopy
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
+from p4utils.utils.topology import NetworkGraph
 
 from graph import Graph
 from mcf import MCF
@@ -23,6 +27,10 @@ from parameters import Parameter
 
 TYPE_TCP = 0x6
 TYPE_UDP = 0x11
+TYPE_IPV4 = 0x800
+TYPE_MPLS = 0x8847;
+
+load_contrib('mpls')
 
 # ============================== TUNABLE PARAMETERS ==============================
 # These parameters allow to fine-tune our solution, obtaining different tradeoffs.
@@ -72,9 +80,9 @@ params = Parameter(
             "prr_28", # 301--400 UDP 0.99
             # "delay_29", # 301--400 UDP 0.06
             # "delay_30", # 301--400 UDP 0.04
-            # "prr_31", # 60001--* UDP 0.75
-            # "prr_32", # 60001--* UDP 0.95
-            # "prr_33", # 60001--* UDP 0.99
+            "prr_31", # 60001--* UDP 0.75
+            "prr_32", # 60001--* UDP 0.95
+            "prr_33", # 60001--* UDP 0.99
             "wp_34", # LON_h0 -> BAR_h0 udp PAR
             "wp_35", # POR_h0 -> GLO_h0 udp PAR
             "wp_36", # BRI_h0 -> BAR_h0 udp PAR
@@ -389,6 +397,167 @@ class FlowManager:
         wps = df[df["type"] == "wp"]
         return wps[["src", "dst", "target", "protocol"]].values.tolist()
 
+# A collection of paths is a mapping from the two endpoints to all paths from
+# the first to the second. The paths per endpoint-tuple are a list of lists,
+# the inner lists contain the name of the switches on the path in order.
+Paths = Dict[Tuple[FlowEndpoint, FlowEndpoint], List[List[str]]]
+
+class PathManager:
+    """Maintains virtual circuits on the switches."""
+
+    def __init__(self, topo : NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
+        self.topo = topo
+        self.controllers = controllers
+
+        # Monotonically incrementing counter for ECMP group IDs per switch
+        self.ecmp_group_counters = defaultdict(int)
+
+        # Currently installed paths
+        self.current_paths : Paths = {}
+
+        # Store different categories of paths. All paths in this dictionary
+        # will be pushed onto the switch on a triggered update.
+        self.paths: Dict[str, Paths] = defaultdict(lambda: defaultdict(list))
+
+        # Similar to self.paths but stores flows that should be dropped
+        self.dropped_flows: Dict[str, List[Flow]] = defaultdict(list)
+
+    def replace_base_paths(self, paths: Paths):
+        self.paths["base"] = paths
+
+    def replace_additional_traffic(self, paths: Paths):
+        self.paths["additional"] = paths
+
+    def get_additional_traffic(self) -> Paths:
+        return self.paths["additional"]
+
+    def trigger_update(self):
+        """Updates all paths installed on the ingress switches to contain all registered ones.
+        Each path is defined on the ingress switch as a stack of MPLS headers that determine the hops.
+
+        Takes into account the previous paths (which are already installed on the switches) to minimize the number of table operations.
+        """
+        st = time.time()
+
+        all_paths = {k: v for p in self.paths.values() for (k, v) in p.items()}
+        # all_paths = self.paths["base"]
+        previous_paths = self.current_paths
+
+        to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))
+        set_all_paths = to_set(all_paths)
+        set_previous_paths = to_set(previous_paths)
+
+        same = set_all_paths & set_previous_paths
+        added = set_all_paths - set_previous_paths
+        removed = set_previous_paths - set_all_paths
+
+        # remove paths
+        for key, _ in removed:
+            paths = previous_paths[key]
+
+            if len(paths) == 0:
+                print("WARNING: empty list of paths passed, skipping")
+                continue
+
+            sw_name = paths[0][1]
+
+            (src_fe, dst_fe) = key
+            src_ip = self.topo.get_host_ip(src_fe.host)
+            dst_ip = self.topo.get_host_ip(dst_fe.host)
+
+            # TODO: We do not remove the paths from table virtual_circuit_paths.
+            # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
+
+            # delete entry from virtual_circuit table
+            print(f"table_delete at {sw_name}")
+            self.controllers[sw_name].table_delete_match(
+                "virtual_circuit",
+                [
+                    str(src_ip),
+                    str(dst_ip),
+                    str(src_fe.port),
+                    str(dst_fe.port),
+                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
+                ],
+            )
+
+        print("done removing circuits")
+
+        # add paths
+        for key, _ in added:
+            paths = all_paths[key]
+
+            if len(paths) == 0:
+                print("WARNING: empty list of paths passed, skipping")
+                continue
+
+            sw_name = paths[0][1]
+
+            (src_fe, dst_fe) = key
+            src_ip = self.topo.get_host_ip(src_fe.host)
+            dst_ip = self.topo.get_host_ip(dst_fe.host)
+
+            # install entry in virtual_circuit_path table
+            for idx, path in enumerate(paths):
+                path_wo_hosts = path[1:-1]
+                print(path, path_wo_hosts)
+                labels = self._get_mpls_stack(path_wo_hosts)
+                print(labels)
+                num_hops = len(labels)
+                action_name = f"mpls_ingress_{num_hops}_hop"
+                action_args = list(map(str, labels[::-1]))
+
+                # add rule
+                print(f"table_add at {sw_name}")
+                self.controllers[sw_name].table_add(
+                    "virtual_circuit_path",
+                    action_name,
+                    [str(self.ecmp_group_counters[sw_name]), str(idx)],
+                    action_args,
+                )
+
+            # install entry in virtual_circuit table
+            self.controllers[sw_name].table_add(
+                "virtual_circuit",
+                "ecmp_group",
+                [
+                    str(src_ip),
+                    str(dst_ip),
+                    str(src_fe.port),
+                    str(dst_fe.port),
+                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
+                ],
+                [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
+            )
+            self.ecmp_group_counters[sw_name] += 1
+
+        print("done adding circuits")
+
+        self.current_paths = all_paths
+
+        et = time.time()
+        print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")
+        print(f"Installing paths took {et - st}", flush=True)
+
+    def _get_mpls_stack(self, path):
+        """
+        Converts the given path into a list of MPLS labels
+
+        Args:
+            path (list(str)): The path as a list of node names
+
+        Returns:
+            list(int): MPLS labels, the first element is the top of the stack
+        """
+        stack = []
+        prev = path[0]
+        for node in path[1:]:
+            port_num = self.topo.node_to_node_port_num(prev, node)
+            stack.append(port_num)
+            prev = node
+
+        return stack
+
 class Controller(object):
     def __init__(self, base_traffic_file, slas_file):
         """Initializes a new controller instance and performs some setup tasks.
@@ -402,13 +571,13 @@ class Controller(object):
         self.topo = load_topo(topo_file)
         self.g = Graph(topo_file)
         self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
-        self.ecmp_group_counters = defaultdict(int)
 
         self.additional_udp : List[Flow] = []
 
         self.filtered_slas = preprocess_slas(slas_file)
         self.base_traffic = preprocess_base_traffic(base_traffic_file)
         self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
+        self.paths_manager = PathManager(self.topo, self.controllers)
 
         self._prepare_additional_traffic()
         self.init_controllers()
@@ -419,8 +588,9 @@ class Controller(object):
         self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
         additional_manager = FlowManager(self.g, self.additional_traffic_params, self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
-        # For the flow computations for the additional traffic, we don't want to normalize
+        # For the flow computations for the additional traffic, we don't want to normalize and we only want a single interval
         self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = False
+        self.additional_traffic_params.MCF_INTERVAL_SIZE = self.additional_traffic_params.TOTAL_TIME
 
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
@@ -527,25 +697,61 @@ class Controller(object):
             ip = packet[IP]
             udp = packet[UDP]
 
-            src = str(ip.src)
+            src = self.topo.get_host_name(str(ip.src))
             sport = udp.sport
-            dst = str(ip.dst)
+            dst = self.topo.get_host_name(str(ip.dst))
             dport = udp.dport
 
             # TODO use actual time values (also add option to set default length of additional traffic)
             flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
 
+            # TODO properly handle empty paths for a flow (install drop action)
+            # Manually create the correct MPLS stack and forward the packet
+            src_fe = flow.to_source_endpoint()
+            dst_fe = flow.to_dest_endpoint()
+
+            paths = self.paths_manager.get_additional_traffic()[(src_fe, dst_fe)]
+            num_paths = len(paths)
+
+            if num_paths > 0:
+                chosen = paths[random.randrange(num_paths)]
+                labels = self.paths_manager._get_mpls_stack(chosen)
+
+                next_hop = labels[0]
+                labels = labels[1:]
+
+                out = packet.copy()
+                for (i, label) in enumerate(labels):
+                    s = 0 if i < len(labels) - 1 else 1
+
+                    out /= MPLS(label=label, s=s, ttl=ip.ttl - 1)
+
+                out /= ip
+                out /= udp
+
+                out[Ether].type = TYPE_MPLS if labels else TYPE_IPV4
+
+                out[Ether].src = self.topo.node_to_node_mac(switch_name, self.topo.port_to_node(switch_name, next_hop + 1))
+                out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1), switch_name)
+
+                out_bytes = raw(out)
+
+                send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+                send_socket.bind((self.topo.get_interfaces(switch_name)[next_hop], 0))
+                send_socket.send(out_bytes)
+
             if flow in self.additional_udp:
-                # TODO maybe log an error or push the packet to the egress
-                # This shouldn't happen since after the first additional
-                # traffic packet is received, a new route should be installed
-                # for it in the switch.
                 return
+
+            print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
 
             self.additional_udp.append(flow)
 
             manager = FlowManager(self.g, self.additional_traffic_params, self.additional_udp, self.filtered_slas)
             manager.compute_paths_mcf()
+
+            self.paths_manager.replace_additional_traffic(manager.paths)
+            self.paths_manager.trigger_update()
 
             # TODO install paths
             # TODO install drop actions for rejected flows
@@ -571,17 +777,17 @@ class Controller(object):
         print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
         print("Recomputing MCF solution")
-        previous_paths = self.flow_manager.paths
         self.flow_manager.compute_paths_mcf(failures)
 
         print("Installing new paths")
-        # install new paths
-        self.install_paths(self.flow_manager.paths, previous_paths)
+        self.paths_manager.replace_base_paths(self.flow_manager.paths)
+        self.paths_manager.trigger_update()
 
     def run(self):
         """Run function"""
         self.install_base_table_entries()
-        self.install_paths(self.flow_manager.paths)
+        self.paths_manager.replace_base_paths(self.flow_manager.paths)
+        self.paths_manager.trigger_update()
 
     def install_base_table_entries(self):
         """Installs the table entries for basic forwarding operations, namely for forwarding to directly connected hosts
@@ -628,132 +834,6 @@ class Controller(object):
                     [str(port_num), str(1)],
                     [neighbor_mac, str(port_num)],
                 )
-
-    def install_paths(self, all_paths, previous_paths=None):
-        """Installs paths on the ingress switches such that they add the correct MPLS header stacks to packets.
-        Takes into account the previous paths (which are already installed on the switches) to minimize the number of table operations.
-
-        Args:
-            all_paths (dict): (All) paths that should be installed on the switches
-            previous_paths (dict): The paths that are already installed on the switches
-        """
-        st = time.time()
-
-        if previous_paths is None:
-            previous_paths = {}
-
-        to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))
-        set_all_paths = to_set(all_paths)
-        set_previous_paths = to_set(previous_paths)
-
-        same = set_all_paths & set_previous_paths
-        added = set_all_paths - set_previous_paths
-        removed = set_previous_paths - set_all_paths
-
-        # remove paths
-        for key, _ in removed:
-            paths = previous_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
-            (src_fe, dst_fe) = key
-            src_ip = self.topo.get_host_ip(src_fe.host)
-            dst_ip = self.topo.get_host_ip(dst_fe.host)
-
-            # TODO: We do not remove the paths from table virtual_circuit_paths.
-            # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
-
-            # delete entry from virtual_circuit table
-            print(f"table_delete at {sw_name}")
-            self.controllers[sw_name].table_delete_match(
-                "virtual_circuit",
-                [
-                    str(src_ip),
-                    str(dst_ip),
-                    str(src_fe.port),
-                    str(dst_fe.port),
-                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
-                ],
-            )
-
-        print("done removing circuits")
-
-        # add paths
-        for key, _ in added:
-            paths = all_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
-            (src_fe, dst_fe) = key
-            src_ip = self.topo.get_host_ip(src_fe.host)
-            dst_ip = self.topo.get_host_ip(dst_fe.host)
-
-            # install entry in virtual_circuit_path table
-            for idx, path in enumerate(paths):
-                path_wo_hosts = path[1:-1]
-                print(path, path_wo_hosts)
-                labels = self._get_mpls_stack(path_wo_hosts)
-                print(labels)
-                num_hops = len(labels)
-                action_name = f"mpls_ingress_{num_hops}_hop"
-                action_args = list(map(str, labels[::-1]))
-
-                # add rule
-                print(f"table_add at {sw_name}")
-                self.controllers[sw_name].table_add(
-                    "virtual_circuit_path",
-                    action_name,
-                    [str(self.ecmp_group_counters[sw_name]), str(idx)],
-                    action_args,
-                )
-
-            # install entry in virtual_circuit table
-            self.controllers[sw_name].table_add(
-                "virtual_circuit",
-                "ecmp_group",
-                [
-                    str(src_ip),
-                    str(dst_ip),
-                    str(src_fe.port),
-                    str(dst_fe.port),
-                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
-                ],
-                [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
-            )
-            self.ecmp_group_counters[sw_name] += 1
-
-        print("done adding circuits")
-
-        et = time.time()
-        print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")
-        print(f"Installing paths took {et - st}", flush=True)
-
-    def _get_mpls_stack(self, path):
-        """
-        Converts the given path into a list of MPLS labels
-
-        Args:
-            path (list(str)): The path as a list of node names
-
-        Returns:
-            list(int): MPLS labels, the first element is the top of the stack
-        """
-        stack = []
-        prev = path[0]
-        for node in path[1:]:
-            port_num = self.topo.node_to_node_port_num(prev, node)
-            stack.append(port_num)
-            prev = node
-
-        return stack
 
     def main(self):
         """Main function"""

@@ -444,14 +444,10 @@ class PathManager:
         # remove paths
         for key, _ in removed:
             paths = previous_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
             (src_fe, dst_fe) = key
+
+            sw_name = src_fe.get_switch()
+
             src_ip = self.topo.get_host_ip(src_fe.host)
             dst_ip = self.topo.get_host_ip(dst_fe.host)
 
@@ -476,50 +472,57 @@ class PathManager:
         # add paths
         for key, _ in added:
             paths = all_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
             (src_fe, dst_fe) = key
+
+            sw_name = src_fe.get_switch()
             src_ip = self.topo.get_host_ip(src_fe.host)
             dst_ip = self.topo.get_host_ip(dst_fe.host)
 
-            # install entry in virtual_circuit_path table
-            for idx, path in enumerate(paths):
-                path_wo_hosts = path[1:-1]
-                print(path, path_wo_hosts)
-                labels = self._get_mpls_stack(path_wo_hosts)
-                print(labels)
-                num_hops = len(labels)
-                action_name = f"mpls_ingress_{num_hops}_hop"
-                action_args = list(map(str, labels[::-1]))
+            if paths:
+                ecmp_group = self.ecmp_group_counters[sw_name]
+                self.ecmp_group_counters[sw_name] += 1
 
-                # add rule
-                print(f"table_add at {sw_name}")
+                # install entry in virtual_circuit_path table
+                for idx, path in enumerate(paths):
+                    path_wo_hosts = path[1:-1]
+                    print(path, path_wo_hosts)
+                    labels = self._get_mpls_stack(path_wo_hosts)
+                    print(labels)
+                    num_hops = len(labels)
+                    action_name = f"mpls_ingress_{num_hops}_hop"
+                    action_args = list(map(str, labels[::-1]))
+
+                    # add rule
+                    print(f"table_add at {sw_name}")
+                    self.controllers[sw_name].table_add(
+                        "virtual_circuit_path",
+                        action_name,
+                        [str(ecmp_group), str(idx)],
+                        action_args,
+                    )
+
+                # install entry in virtual_circuit table
                 self.controllers[sw_name].table_add(
-                    "virtual_circuit_path",
-                    action_name,
-                    [str(self.ecmp_group_counters[sw_name]), str(idx)],
-                    action_args,
+                    "virtual_circuit",
+                    "ecmp_group",
+                    [
+                        str(src_ip),
+                        str(dst_ip),
+                        str(src_fe.port),
+                        str(dst_fe.port),
+                        str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
+                    ],
+                    [str(ecmp_group), str(len(paths))],
                 )
-
-            # install entry in virtual_circuit table
-            self.controllers[sw_name].table_add(
-                "virtual_circuit",
-                "ecmp_group",
-                [
+            else:
+                # For empty paths, install a drop action
+                self.controllers[sw_name].table_add("virtual_circuit", "drop", [
                     str(src_ip),
                     str(dst_ip),
                     str(src_fe.port),
                     str(dst_fe.port),
                     str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
-                ],
-                [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
-            )
-            self.ecmp_group_counters[sw_name] += 1
+                ])
 
         print("done adding circuits")
 

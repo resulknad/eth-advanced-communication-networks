@@ -1237,19 +1237,23 @@ control MyIngress(inout headers hdr,
                 get_random_flowlet_id();
             }
 
-            if (virtual_circuit.apply().hit) {
-                virtual_circuit_path.apply();
-            } else if (!ipv4_lpm.apply().hit) {
-                #if DO_ADDITIONAL
-                // This is additional traffic that does not yet have a path allocated
-                // We send it to the controller so that it can set up paths.
-                if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) {
-                    clone3(CloneType.I2E, 100, meta);
+            switch (virtual_circuit.apply().action_run) {
+                ecmp_group: {
+                    virtual_circuit_path.apply();
                 }
-                drop();
-                #endif
+                no_action: {
+                   if (!ipv4_lpm.apply().hit) {
+#if DO_ADDITIONAL
+                       // This is additional traffic that does not yet have a path allocated
+                       // We send it to the controller so that it can set up paths.
+                       if (hdr.udp.isValid() && hdr.udp.srcPort >= 60000) {
+                           clone(CloneType.I2E, 100);
+                       }
+                       drop();
+#endif
+                   }
+                }
             }
-
         }
 
         // handle MPLS packets (note that they may have just become MPLS packets by applying the tables above)

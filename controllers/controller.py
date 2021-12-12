@@ -3,7 +3,8 @@ from collections import defaultdict
 import threading
 import math
 import time
-from scapy.all import sniff, Ether, raw, UDP, IP, load_contrib
+from scapy.all import sniff, Ether, raw, UDP, IP
+from scapy.contrib.mpls import MPLS
 import pandas as pd
 import struct
 from dataclasses import dataclass
@@ -29,8 +30,6 @@ TYPE_TCP = 0x6
 TYPE_UDP = 0x11
 TYPE_IPV4 = 0x800
 TYPE_MPLS = 0x8847
-
-load_contrib('mpls')
 
 # ============================== TUNABLE PARAMETERS ==============================
 # These parameters allow to fine-tune our solution, obtaining different tradeoffs.
@@ -410,10 +409,9 @@ class PathManager:
 
         # Store different categories of paths. All paths in this dictionary
         # will be pushed onto the switch on a triggered update.
+        # If the list of paths for an endpoint pair is empty, an explicit drop
+        # action will be installed for those flows.
         self.paths: Dict[str, Paths] = defaultdict(lambda: defaultdict(list))
-
-        # Similar to self.paths but stores flows that should be dropped
-        self.dropped_flows: Dict[str, List[Flow]] = defaultdict(list)
 
     def replace_base_paths(self, paths: Paths):
         self.paths["base"] = paths
@@ -433,7 +431,6 @@ class PathManager:
         st = time.time()
 
         all_paths = {k: v for p in self.paths.values() for (k, v) in p.items()}
-        # all_paths = self.paths["base"]
         previous_paths = self.current_paths
 
         to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))

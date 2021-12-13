@@ -14,6 +14,8 @@
 
 #define FAILURE_THRESHOLD 48w500000 // 0.5s # WARNING: must be bigger than heartbeat frequency.
 
+// Disable additional traffic by default
+#define DO_ADDITIONAL 0
 #ifndef DO_ADDITIONAL
 #define DO_ADDITIONAL 1
 #endif

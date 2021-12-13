@@ -31,6 +31,8 @@ class Parameter:
     CONTROLLER_FORWARD_MPLS: bool
     """Whether controller should manually create MPLS packets for additional traffic sent to it (because the switch already dropped it)"""
     ADDITIONAL_TRAFFIC_PURGE_INTERVAL: float
-    """Interval in seconds between purges of additional traffic routes. Set to >> TOTAL_TIME to disable purging"""
+    """Interval in seconds between purges of additional traffic routes."""
+    ADDITIONAL_TRAFFIC_PURGE: bool
+    """Whether additional routes should be purged periodically"""
     SLAS: List[str]
     """Names of SLAs the controller should try to install routes for"""

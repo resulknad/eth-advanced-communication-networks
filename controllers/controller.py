@@ -53,6 +53,7 @@ params = Parameter(
     ADDITIONAL_BW=10,
     CONTROLLER_FORWARD_MPLS=True,
     ADDITIONAL_TRAFFIC_PURGE_INTERVAL=1000,
+    ADDITIONAL_TRAFFIC_PURGE=False,
     SLAS=[
         "fcr_1", # 1--100 TCP 1
         # "prr_2", # 1--100 UDP 0.99
@@ -84,7 +85,7 @@ params = Parameter(
         "prr_28", # 301--400 UDP 0.99
         # "delay_29", # 301--400 UDP 0.06
         # "delay_30", # 301--400 UDP 0.04
-        "prr_31", # 60001--* UDP 0.75
+        # "prr_31", # 60001--* UDP 0.75
         # "prr_32", # 60001--* UDP 0.95
         # "prr_33", # 60001--* UDP 0.99
         # "wp_34", # LON_h0 -> BAR_h0 udp PAR
@@ -801,7 +802,8 @@ class Controller(object):
 
     def run(self):
         """Run function"""
-        threading.Thread(target=Controller.reset_thread, args=[self]).start()
+        if params.ADDITIONAL_TRAFFIC_PURGE:
+            threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
         self.paths_manager.replace_base_paths(self.flow_manager.paths)
         self.paths_manager.trigger_update()

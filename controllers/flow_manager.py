@@ -8,6 +8,7 @@ from graph import Graph
 from parameters import Parameter
 from mcf import MCF
 from flow import Flow
+from table_manager import Paths
 
 
 class FlowManager:
@@ -21,6 +22,10 @@ class FlowManager:
         self.filtered_slas = filtered_slas
         self._paths = {}
         self._path_weights = {}
+
+        # Caches computed paths and path weights for each set of link failures
+        self.failure_paths: Dict[frozenset, Paths] = {}
+        self.failure_weights: Dict[frozenset, Dict] = {}
 
         # Flows from base_traffic that are accepted/rejected based on SLAs
         self.accepted_flows: List[Flow] = []
@@ -69,6 +74,14 @@ class FlowManager:
 
         if failures is None:
             failures = []
+
+        failure_set = frozenset(failures)
+
+        if failure_set in self.failure_paths:
+            print("Was able to reuse cached paths")
+            self._paths = self.failure_paths[failure_set]
+            self._path_weights = self.failure_weights[failure_set]
+            return
 
         flows_to_path = defaultdict(list)
         flows_to_path_weights = defaultdict(list)
@@ -147,6 +160,9 @@ class FlowManager:
 
         self._paths = flows_to_path
         self._path_weights = flows_to_path_weights
+
+        self.failure_paths[failure_set] = self._paths
+        self.failure_weights[failure_set] = self._path_weights
 
         et = time.time()
         print(f"Computing new paths took {et - st}", flush=True)

@@ -8,6 +8,7 @@ from scapy.contrib.mpls import MPLS
 import pandas as pd
 import struct
 from dataclasses import dataclass
+import dataclasses
 import random
 
 import socket
@@ -50,7 +51,7 @@ DEFAULT_PARAMS = Parameter(
     tcp_ack_bw_multiplier=0.5,
     heartbeat_frequency=0.1,
     tcp_duration_multiplier=1.5,
-    additional_bw=10,
+    additional_traffic_bw=10,
     controller_forward_mpls=True,
     additional_traffic_purge_interval=1000,
     additional_traffic_purge=False,
@@ -95,8 +96,6 @@ DEFAULT_PARAMS = Parameter(
         "wp_38", # LIS_h0 -> BER_h0 udp MAD
     ])
 
-params = deepcopy(DEFAULT_PARAMS)
-
 
 @dataclass
 class Flow:
@@ -134,7 +133,7 @@ class Flow:
         return self.end_time - self.start_time
 
 
-def preprocess_slas(slas_file):
+def preprocess_slas(slas_file, params : Parameter):
     """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
     out the SLAs that should not be considered. The remaining SLAs (to be considered) are stored as a DataFrame attribute.
 
@@ -163,7 +162,7 @@ def preprocess_slas(slas_file):
     return df
 
 
-def preprocess_base_traffic(base_traffic_file):
+def preprocess_base_traffic(base_traffic_file, params: Parameter):
     """Reads the base traffic file and transforms size-based (TCP) flows to bandwidth/duration-based flows.
 
     Args:
@@ -284,7 +283,7 @@ class FlowManager:
                         )
                 else:
                     # find path for that new flow
-                    FlowManager.add_flow_to_mcf(m, f, interval_length)
+                    FlowManager.add_flow_to_mcf(m, f, interval_length, self.params)
 
             # add waypoints
             FlowManager.add_waypoints_to_mcf(m, self._get_waypoints())
@@ -335,7 +334,7 @@ class FlowManager:
             mcf.add_waypoint_to_all(src, target, wp, protocol)
 
     @staticmethod
-    def add_flow_to_mcf(mcf, flow, interval_length):
+    def add_flow_to_mcf(mcf, flow, interval_length, params: Parameter):
         """Adds a flow to the given MCF problem. Cost and bandwidth are adjusted depending on tunable parameters.
         For TCP flows, an additional reverse flow is added to allow ACKs to be delivered.
 
@@ -578,7 +577,7 @@ class PathManager:
 
 
 class Controller(object):
-    def __init__(self, base_traffic_file, slas_file):
+    def __init__(self, base_traffic_file, slas_file, params=DEFAULT_PARAMS):
         """Initializes a new controller instance and performs some setup tasks.
 
         Args:
@@ -590,12 +589,13 @@ class Controller(object):
         self.topo = load_topo(topo_file)
         self.g = Graph(topo_file)
         self.controllers: Dict[str, SimpleSwitchThriftAPI] = {}
+        self.params = params
 
         self.additional_udp: List[Flow] = []
 
-        self.filtered_slas = preprocess_slas(slas_file)
-        self.base_traffic = preprocess_base_traffic(base_traffic_file)
-        self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
+        self.filtered_slas = preprocess_slas(slas_file, self.params)
+        self.base_traffic = preprocess_base_traffic(base_traffic_file, self.params)
+        self.flow_manager = FlowManager(self.g, self.params, self.base_traffic, self.filtered_slas)
         self.additional_manager: FlowManager = None # FlowManager for additional traffic
         self.paths_manager = PathManager(self.topo, self.controllers)
 
@@ -605,13 +605,10 @@ class Controller(object):
         self.init_heartbeats()
 
     def _prepare_additional_traffic(self):
-        self.additional_traffic_params = deepcopy(params)
-        self.additional_traffic_params.normalize_bw_across_time = True
-        additional_manager = FlowManager(self.g, self.additional_traffic_params, self.base_traffic, self.filtered_slas)
+        additional_manager = FlowManager(self.g, dataclasses.replace(self.params, normalize_bw_across_time=True), self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
         # For the flow computations for the additional traffic, we don't want to normalize and we only want a single interval
-        self.additional_traffic_params.normalize_bw_across_time = False
-        self.additional_traffic_params.mcf_interval_size = self.additional_traffic_params.total_time
+        self.additional_traffic_params = dataclasses.replace(self.params, normalize_bw_across_time=False, mcf_interval_size=self.params.total_time)
 
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
@@ -640,7 +637,7 @@ class Controller(object):
         self._set_mirroring_sessions()
 
         # initiate the heartbeat messages
-        self._heartbeat(params.heartbeat_frequency)
+        self._heartbeat(self.params.heartbeat_frequency)
         print("started sending heartbeats")
 
         # Sniff the traffic coming from switches
@@ -724,7 +721,7 @@ class Controller(object):
             dport = udp.dport
 
             # TODO use actual time values (also add option to set default length of additional traffic)
-            flow = Flow(src, sport, dst, dport, "udp", params.additional_bw, 0, 1)
+            flow = Flow(src, sport, dst, dport, "udp", self.params.additional_traffic_bw, 0, 1)
 
             if flow not in self.additional_udp:
                 print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
@@ -743,7 +740,7 @@ class Controller(object):
             # the controller. We can choose to manually create the MPLS header
             # stack + select the ECMP group in the controller and forward it to
             # the correct next hop.
-            if params.controller_forward_mpls:
+            if self.params.controller_forward_mpls:
                 src_fe = flow.to_source_endpoint()
                 dst_fe = flow.to_dest_endpoint()
 
@@ -804,7 +801,7 @@ class Controller(object):
 
     def run(self):
         """Run function"""
-        if params.additional_traffic_purge:
+        if self.params.additional_traffic_purge:
             threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
         self.paths_manager.replace_base_paths(self.flow_manager.paths)
@@ -813,7 +810,7 @@ class Controller(object):
     def reset_thread(self):
         """Thread to periodically reset additional traffic paths"""
         while True:
-            time.sleep(params.additional_traffic_purge_interval)
+            time.sleep(self.params.additional_traffic_purge_interval)
             print("Resetting all additional traffic")
             self.additional_udp = []
             self.paths_manager.replace_additional_traffic({})
@@ -883,4 +880,4 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    controller = Controller(args.base_traffic, args.slas).main()
+    controller = Controller(args.base_traffic, args.slas, DEFAULT_PARAMS).main()

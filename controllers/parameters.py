@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import List
 
 
-@dataclass
+@dataclass(frozen=True)
 class Parameter:
     total_time: float
     """Number of seconds the simulation runs for (without warmup)"""
-    mcf_interval_size: float  # seconds
-    """The total time is divided into intervals of this size for each of which paths are calculated."""
+    mcf_interval_size: float
+    """The total time is divided into intervals of this size in seconds for each of which paths are calculated."""
     normalize_bw_across_time: bool
     tcp_default_bw: float
     """Bandwidth assigned to TCP base traffic in Mbps"""

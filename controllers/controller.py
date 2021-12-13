@@ -48,6 +48,7 @@ params = Parameter(
     HEARTBEAT_FREQUENCY=0.1,
     TCP_DURATION_MULTIPLIER=1.5,
     ADDITIONAL_BW=10,
+    CONTROLLER_FORWARD_MPLS=False,
     SLAS=[
         "fcr_1", # 1--100 TCP 1
         # "prr_2", # 1--100 UDP 0.99
@@ -218,9 +219,6 @@ class FlowManager:
 
             start_time = end_time
 
-        # Calculate base paths using base traffic and without failures
-        self.compute_paths_mcf()
-
     @property
     def paths(self):
         return self._paths
@@ -247,6 +245,7 @@ class FlowManager:
 
         start_time = 0
         for end_time in self.intervals:
+            print(f"Solving for interval [{start_time}, {end_time})")
             flows = self.flows_for_interval[end_time]
             m = MCF(self.g)
 
@@ -591,6 +590,7 @@ class Controller(object):
         self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
         self.paths_manager = PathManager(self.topo, self.controllers)
 
+        self.flow_manager.compute_paths_mcf()
         self._prepare_additional_traffic()
         self.init_controllers()
         self.init_heartbeats()
@@ -716,44 +716,47 @@ class Controller(object):
             # TODO use actual time values (also add option to set default length of additional traffic)
             flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
 
-            # TODO properly handle empty paths for a flow (install drop action)
-            # this is needed because if an additional flow is rejected, we don't want to constantly get packets sent to the controller.
+            # While creating the paths for additional traffic, the switch will
+            # have sent a bunch of packets for the same additional traffic to
+            # the controller. We can choose to manually create the MPLS header
+            # stack + select the ECMP group in the controller and forward it to
+            # the correct next hop.
+            if params.CONTROLLER_FORWARD_MPLS:
+                src_fe = flow.to_source_endpoint()
+                dst_fe = flow.to_dest_endpoint()
 
-            src_fe = flow.to_source_endpoint()
-            dst_fe = flow.to_dest_endpoint()
+                paths = self.paths_manager.get_additional_traffic()[(src_fe, dst_fe)]
+                num_paths = len(paths)
 
-            paths = self.paths_manager.get_additional_traffic()[(src_fe, dst_fe)]
-            num_paths = len(paths)
+                # Manually create the correct MPLS stack and forward the packet
+                if num_paths > 0:
+                    chosen = paths[random.randrange(num_paths)]
+                    labels = self.paths_manager._get_mpls_stack(chosen)
 
-            # Manually create the correct MPLS stack and forward the packet
-            if num_paths > 0:
-                chosen = paths[random.randrange(num_paths)]
-                labels = self.paths_manager._get_mpls_stack(chosen)
+                    next_hop = labels[0]
+                    labels = labels[1:]
 
-                next_hop = labels[0]
-                labels = labels[1:]
+                    out = packet.copy()
+                    for (i, label) in enumerate(labels):
+                        s = 0 if i < len(labels) - 1 else 1
 
-                out = packet.copy()
-                for (i, label) in enumerate(labels):
-                    s = 0 if i < len(labels) - 1 else 1
+                        out /= MPLS(label=label, s=s, ttl=ip.ttl - 1)
 
-                    out /= MPLS(label=label, s=s, ttl=ip.ttl - 1)
+                    out /= ip
+                    out /= udp
 
-                out /= ip
-                out /= udp
+                    out[Ether].type = TYPE_MPLS if labels else TYPE_IPV4
 
-                out[Ether].type = TYPE_MPLS if labels else TYPE_IPV4
+                    out[Ether].src = self.topo.node_to_node_mac(switch_name,
+                                                                self.topo.port_to_node(switch_name, next_hop + 1))
+                    out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1),
+                                                                switch_name)
 
-                out[Ether].src = self.topo.node_to_node_mac(switch_name,
-                                                            self.topo.port_to_node(switch_name, next_hop + 1))
-                out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1),
-                                                            switch_name)
+                    out_bytes = raw(out)
 
-                out_bytes = raw(out)
-
-                send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-                send_socket.bind((self.topo.get_interfaces(switch_name)[next_hop], 0))
-                send_socket.send(out_bytes)
+                    send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+                    send_socket.bind((self.topo.get_interfaces(switch_name)[next_hop], 0))
+                    send_socket.send(out_bytes)
 
             if flow in self.additional_udp:
                 return

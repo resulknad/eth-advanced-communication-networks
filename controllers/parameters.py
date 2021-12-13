@@ -16,4 +16,5 @@ class Parameter:
     HEARTBEAT_FREQUENCY: float # seconds
     TCP_DURATION_MULTIPLIER: float
     ADDITIONAL_BW: float # Mbps
+    CONTROLLER_FORWARD_MPLS: bool
     SLAS: List[str]

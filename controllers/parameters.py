@@ -17,4 +17,5 @@ class Parameter:
     TCP_DURATION_MULTIPLIER: float
     ADDITIONAL_BW: float # Mbps
     CONTROLLER_FORWARD_MPLS: bool
+    ADDITIONAL_TRAFFIC_PURGE_INTERVAL: float #seconds
     SLAS: List[str]

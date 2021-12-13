@@ -48,7 +48,8 @@ params = Parameter(
     HEARTBEAT_FREQUENCY=0.1,
     TCP_DURATION_MULTIPLIER=1.5,
     ADDITIONAL_BW=10,
-    CONTROLLER_FORWARD_MPLS=False,
+    CONTROLLER_FORWARD_MPLS=True,
+    ADDITIONAL_TRAFFIC_PURGE_INTERVAL=1000,
     SLAS=[
         "fcr_1", # 1--100 TCP 1
         # "prr_2", # 1--100 UDP 0.99
@@ -806,7 +807,8 @@ class Controller(object):
 
     def reset_thread(self):
         while True:
-            time.sleep(5)
+            time.sleep(params.ADDITIONAL_TRAFFIC_PURGE_INTERVAL)
+            print("Resetting all additional traffic")
             self.additional_udp = []
             self.paths_manager.replace_additional_traffic({})
             self.paths_manager.trigger_update()

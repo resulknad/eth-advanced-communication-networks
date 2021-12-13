@@ -1,0 +1,4 @@
+src_switch, dst_switch, failure_time, duration
+ADDED_1, , 15, 10
+ADDED_2, , 20, 10
+ADDED_3, , 35, 10

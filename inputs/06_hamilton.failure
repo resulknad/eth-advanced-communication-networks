@@ -1,0 +1,36 @@
+src_switch, dst_switch, failure_time, duration
+
+AMS, FRA, 6, 1
+AMS, LON, 6, 2
+AMS, PAR, 10, 1
+AMS, FRA, 10, 1
+BAR, MAD, 12, 1
+
+LON, MAD, 12, 1
+LIS, POR, 14, 1
+BAR, PAR, 16, 1
+FRA, PAR, 16, 1
+MAD, POR, 18, 1
+
+AMS, LON, 20, 1
+AMS, PAR, 20, 1
+BRI, GLO, 22, 1
+ADDED_3,, 24, 1
+GLO, LON, 27, 1
+
+FRA, LON, 28, 1
+AMS, LON, 28, 1
+FRA, MUN, 30, 1
+BER, FRA, 31, 1
+FRA, PAR, 32, 1
+
+AMS, PAR, 32, 1
+BRI, LON, 33, 1
+BER, MUN, 34, 1
+ADDED_1,, 33, 1
+LIS, LON, 40, 1
+
+LON, MAD, 42, 1
+LON, FRA, 42, 1
+LON, PAR, 44, 1
+ADDED_2,, 45, 1

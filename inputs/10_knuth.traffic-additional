@@ -1,0 +1,6 @@
+src, dst, sport, dport, protocol, rate, size, duration, start_time
+LIS_h0, MUN_h0, 60001, 60001, udp, 10Mbps,, 10, 5
+EIN_h0, MAD_h0, 60002, 60002, udp, 10Mbps,, 10, 15
+LIS_h0, BER_h0, 60003, 60003, udp, 10Mbps,, 10, 25
+GLO_h0, MAD_h0, 60004, 60004, udp, 10Mbps,, 10, 35
+BER_h0, POR_h0, 60005, 60005, udp, 10Mbps,, 10, 45

@@ -722,6 +722,18 @@ class Controller(object):
             # TODO use actual time values (also add option to set default length of additional traffic)
             flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
 
+            if flow not in self.additional_udp:
+                print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
+
+                self.additional_udp.append(flow)
+
+                self.additional_manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params,
+                                                      self.additional_udp, self.filtered_slas)
+                self.additional_manager.compute_paths_mcf(list(self.failed_links))
+
+                self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
+                self.paths_manager.trigger_update()
+
             # While creating the paths for additional traffic, the switch will
             # have sent a bunch of packets for the same additional traffic to
             # the controller. We can choose to manually create the MPLS header
@@ -763,20 +775,6 @@ class Controller(object):
                     send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
                     send_socket.bind((self.topo.get_interfaces(switch_name)[next_hop], 0))
                     send_socket.send(out_bytes)
-
-            if flow in self.additional_udp:
-                return
-
-            print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
-
-            self.additional_udp.append(flow)
-
-            self.additional_manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params,
-                                                  self.additional_udp, self.filtered_slas)
-            self.additional_manager.compute_paths_mcf(list(self.failed_links))
-
-            self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
-            self.paths_manager.trigger_update()
 
     def link_state_changed(self, failures):
         """Callback function that is invoked whenever a link failure or recovery is detected.

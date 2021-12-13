@@ -26,14 +26,17 @@ from flow_endpoint import FlowEndpoint
 from heartbeat_generator import HeartBeatGenerator, TYPE_HEARTBEAT
 from parameters import Parameter
 
+# IP protocol field values
 TYPE_TCP = 0x6
 TYPE_UDP = 0x11
+
+# Ethernet protocol field values
 TYPE_IPV4 = 0x800
 TYPE_MPLS = 0x8847
 
 # ============================== TUNABLE PARAMETERS ==============================
 # These parameters allow to fine-tune our solution, obtaining different tradeoffs.
-# The parameters are described in detail in the README.
+# The parameters are described in detail in parameters.py
 
 params = Parameter(
     TOTAL_TIME=60,
@@ -183,8 +186,11 @@ def preprocess_base_traffic(base_traffic_file):
 
 
 class FlowManager:
+    """Calculates per-interval paths for a given list of traffic and SLAs
+    The simulation time is divided into discrete intervals. For each interval
+    paths for traffic within that interval are searched using a
+    multi-commodity-flow problem."""
     def __init__(self, graph: Graph, params: Parameter, base_traffic: List[Flow], filtered_slas):
-        # read topology
         self.g = deepcopy(graph)
         self.params = params
         self.filtered_slas = filtered_slas
@@ -192,9 +198,8 @@ class FlowManager:
         self._path_weights = {}
 
         # Flows from base_traffic that are accepted/rejected based on SLAs
-        self.accepted_flows : List[Flow] = []
-        self.rejected_flows : List[Flow] = []
-
+        self.accepted_flows: List[Flow] = []
+        self.rejected_flows: List[Flow] = []
 
         f: Flow
         for f in base_traffic:
@@ -231,7 +236,6 @@ class FlowManager:
     def compute_paths_mcf(self, failures=None):
         """Computes paths by solving a multi-commodity flow problem for each time interval, taking into account a list of failed links.
         The paths are stored as an attribute.
-        Note: self.init_mcf() should have been called once beforehand.
 
         Args:
             failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
@@ -414,7 +418,7 @@ Paths = Dict[Tuple[FlowEndpoint, FlowEndpoint], List[List[str]]]
 
 
 class PathManager:
-    """Maintains virtual circuits on the switches."""
+    """Keeps track and maintains virtual circuits on the switches."""
     def __init__(self, topo: NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
         self.topo = topo
         self.controllers = controllers
@@ -659,7 +663,7 @@ class Controller(object):
         sniff(iface=cpu_interfaces, prn=self._process_packet)
 
     def _process_packet(self, pkt):
-        """Parses packets sent by the switches to detect failure and recovery notifications.
+        """Parses packets sent by the switches to detect failure and recovery notifications as well as additional traffic.
 
         Args:
             pkt (scapy packet): The packet to process
@@ -706,6 +710,7 @@ class Controller(object):
                         self.failed_links.remove(affected_link)
                         self.link_state_changed(list(self.failed_links))
         elif UDP in packet and packet[UDP].sport >= 60000:
+            # This is an additional traffic packet
             ip = packet[IP]
             udp = packet[UDP]
 
@@ -766,20 +771,12 @@ class Controller(object):
 
             self.additional_udp.append(flow)
 
-            manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params, self.additional_udp, self.filtered_slas)
-            manager.compute_paths_mcf(list(self.failed_links))
+            self.additional_manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params,
+                                                  self.additional_udp, self.filtered_slas)
+            self.additional_manager.compute_paths_mcf(list(self.failed_links))
 
-            self.paths_manager.replace_additional_traffic(manager.paths)
+            self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
             self.paths_manager.trigger_update()
-
-            # TODO handle packet indicating an additional flow
-            # Create initial MCF with base traffic averaged over entire runtime
-            # Create new MCF from residual graph with only additional traffic as commodities
-            # Solve MCF and install new paths as usual (don't delete base traffic paths)
-            # We need to somehow be able to tell if an additional path is actually new or just belongs to a flow that the MCF decided to drop
-            # Every X seconds, purge all additional traffic paths (next packet will force controller to compute again)
-            # Re-emit this packet to switch so that it doesn't get lost
-            pass
 
     def link_state_changed(self, failures):
         """Callback function that is invoked whenever a link failure or recovery is detected.
@@ -806,6 +803,7 @@ class Controller(object):
         self.paths_manager.trigger_update()
 
     def reset_thread(self):
+        """Thread to periodically reset additional traffic paths"""
         while True:
             time.sleep(params.ADDITIONAL_TRAFFIC_PURGE_INTERVAL)
             print("Resetting all additional traffic")

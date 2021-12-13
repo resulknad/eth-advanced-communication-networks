@@ -793,6 +793,11 @@ class Controller(object):
 
         print("Installing new paths")
         self.paths_manager.replace_base_paths(self.flow_manager.paths)
+
+        if self.additional_manager:
+            self.additional_manager.compute_paths_mcf(failures)
+            self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
+
         self.paths_manager.trigger_update()
 
     def run(self):

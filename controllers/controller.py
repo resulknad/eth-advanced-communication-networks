@@ -593,6 +593,7 @@ class Controller(object):
         self.filtered_slas = preprocess_slas(slas_file)
         self.base_traffic = preprocess_base_traffic(base_traffic_file)
         self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
+        self.additional_manager : FlowManager = None # FlowManager for additional traffic
         self.paths_manager = PathManager(self.topo, self.controllers)
 
         self.flow_manager.compute_paths_mcf()

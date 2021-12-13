@@ -1,7 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy
 import math
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import time
 
 from graph import Graph
@@ -12,7 +12,7 @@ from flow import Flow
 
 class FlowManager:
     """Calculates per-interval paths for a given list of traffic and SLAs
-    The simulation time is divided into discrete intervals. For each interval
+    The simulation time is divided into discrete intervals. For each interval,
     paths for traffic within that interval are searched using a
     multi-commodity-flow problem."""
     def __init__(self, graph: Graph, params: Parameter, base_traffic: List[Flow], filtered_slas):
@@ -152,7 +152,13 @@ class FlowManager:
         print(f"Computing new paths took {et - st}", flush=True)
 
     @staticmethod
-    def add_waypoints_to_mcf(mcf, wps):
+    def add_waypoints_to_mcf(mcf: MCF, wps: List[Tuple[str, str, str, str]]):
+        """Enforce the given waypoints in the MCF.
+
+        Args:
+            mcf (MCF): The MCF problem instance
+            wps (list(tuple(str, str, str, str))): The waypoint SLAs as a list of (src, target, wp, protocol) tuples
+        """
         for (src, target, wp, protocol) in wps:
             mcf.add_waypoint_to_all(src, target, wp, protocol)
 
@@ -224,7 +230,7 @@ class FlowManager:
                 relevant_slas.append(sla)
         return relevant_slas
 
-    def _get_waypoints(self):
+    def _get_waypoints(self) -> List[Tuple[str, str, str, str]]:
         """Returns the waypoint SLAs from the filtered SLAs
 
         Returns:

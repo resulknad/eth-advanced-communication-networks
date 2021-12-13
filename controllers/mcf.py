@@ -31,7 +31,7 @@ class MCF:
         self.graph.add_node(str(fe))
 
         # add infinite capacity edges from the copies of the node to the actual node
-        self.graph.add_undirected_edge(str(fe), fe.host, delay=0, bw=(2 ** 32))
+        self.graph.add_undirected_edge(str(fe), fe.host, delay=0, bw=(2**32))
         return str(fe)
 
     def subtract_paths(self, paths, weights):
@@ -146,15 +146,13 @@ class MCF:
         # or take the maximum (depending on the argument add_on_conflict)
         _, commodity = self._get_commodity_by_src_and_dst(source, target)
         if not allow_dup_commodity and commodity is not None:
-            print(
-                "WARNING: already have commodity for {} to {}. Will {} the demands {} and {}".format(
-                    commodity.source,
-                    commodity.target,
-                    "add" if add_on_conflict else "take max out of",
-                    demand,
-                    commodity.demand,
-                )
-            )
+            print("WARNING: already have commodity for {} to {}. Will {} the demands {} and {}".format(
+                commodity.source,
+                commodity.target,
+                "add" if add_on_conflict else "take max out of",
+                demand,
+                commodity.demand,
+            ))
 
             if add_on_conflict:
                 commodity.demand += demand
@@ -190,11 +188,7 @@ class MCF:
 
             s_fe = commodity.source_as_fe()
             t_fe = commodity.target_as_fe()
-            if (
-                s_fe.host == source
-                and t_fe.host == target
-                and s_fe.protocol == protocol
-            ):
+            if (s_fe.host == source and t_fe.host == target and s_fe.protocol == protocol):
                 wps_to_add.append([s_fe, t_fe, wp])
 
         # we now waypoint all of those flows
@@ -217,10 +211,9 @@ class MCF:
         if (str(source), str(target)) in self.waypoints:
             print(
                 "WARNING: already have a waypoint for {} --- {} ----> {}. since a call to waypoints makes changes to the commodities"
-                + ", it is of crucial importance to call add_waypoint after setting up all commodoties and only once. IGNORING".format(
-                    source, waypoint, target
-                )
-            )
+                +
+                ", it is of crucial importance to call add_waypoint after setting up all commodoties and only once. IGNORING"
+                .format(source, waypoint, target))
             return
 
         waypoint_str = self._extend_graph_with_flow_endpoint(waypoint)
@@ -231,10 +224,8 @@ class MCF:
         index, commodity = self._get_commodity_by_src_and_dst(str(source), str(target))
         if commodity is None:
             print(
-                "WARNING: cannot add waypoint {} --- {} ----> {} for commodity/flow which has not been added yet. IGNORING.".format(
-                    source, waypoint, target
-                )
-            )
+                "WARNING: cannot add waypoint {} --- {} ----> {} for commodity/flow which has not been added yet. IGNORING."
+                .format(source, waypoint, target))
             return
 
         # delete non-waypointed commodity, but since we are using indexes as ids
@@ -281,8 +272,7 @@ class MCF:
         variables = LpVariable.dicts("Route", (edges_str, commodities_str), 0)
         cost = {
             edge: {
-                commodity: self.graph.edges_map[edge].delay
-                * self.commodities[int(commodity)].cost_multiplier
+                commodity: self.graph.edges_map[edge].delay * self.commodities[int(commodity)].cost_multiplier
                 for commodity in commodities_str
             }
             for edge in edges_str
@@ -292,17 +282,16 @@ class MCF:
         # add excess edges (as in PBR)
         # this ensure that LP is always feasible
         excess_edges_str = [
-            "|".join([c.source, c.target]) + "_commodity" + str(i)
-            for (i, c) in enumerate(self.commodities)
+            "|".join([c.source, c.target]) + "_commodity" + str(i) for (i, c) in enumerate(self.commodities)
         ]
 
-        excess_variables = LpVariable.dicts("Excess", excess_edges_str, 0, 2 ** 32)
+        excess_variables = LpVariable.dicts("Excess", excess_edges_str, 0, 2**32)
 
         # objective: minimize cost over chosen capacity flows
         # minimize edge cost (number of hops basically)
         prob += (
-            lpSum([variables[e][c] * cost[e][c] for (e, c) in edge_commodity])
-            + lpSum([excess_variables[e] * (2 ** 16) for e in excess_edges_str]),
+            lpSum([variables[e][c] * cost[e][c]
+                   for (e, c) in edge_commodity]) + lpSum([excess_variables[e] * (2**16) for e in excess_edges_str]),
             "Sum_of_edge_commodity_cost",
         )
 
@@ -326,33 +315,28 @@ class MCF:
                 # excess edges are handeled separately because they only allow for one commodity
                 outgoing_excess = list(
                     filter(
-                        lambda s: s.startswith(name + "|")
-                        and s.endswith("_commodity" + str(c)),
+                        lambda s: s.startswith(name + "|") and s.endswith("_commodity" + str(c)),
                         excess_edges_str,
-                    )
-                )
+                    ))
                 incoming_excess = list(
                     filter(
                         lambda s: s.endswith("|" + name + "_commodity" + str(c)),
                         excess_edges_str,
-                    )
-                )
+                    ))
                 val = 0
                 if commodity.source == name:
                     val = -commodity.demand
                 elif commodity.target == name:
                     val = commodity.demand
 
-                prob += (
-                    lpSum([variables[e][str(c)] for e in incoming])
-                    + lpSum([excess_variables[e] for e in incoming_excess])
-                ) + (
-                    -lpSum([variables[e][str(c)] for e in outgoing])
-                    - lpSum([excess_variables[e] for e in outgoing_excess])
-                ) == val, "%s_%s_conservation" % (
-                    node.name,
-                    c,
-                )
+                prob += (lpSum([variables[e][str(c)]
+                                for e in incoming]) + lpSum([excess_variables[e] for e in incoming_excess])) + (
+                                    -lpSum([variables[e][str(c)] for e in outgoing]) -
+                                    lpSum([excess_variables[e]
+                                           for e in outgoing_excess])) == val, "%s_%s_conservation" % (
+                                               node.name,
+                                               c,
+                                           )
         # add waypoint constraints
         # basically we split a commodity into two commodities
         # and now require that either both are satisfied to the same degree
@@ -361,12 +345,9 @@ class MCF:
             c1 = self.commodities[c1_id]
             c2 = self.commodities[c2_id]
             prob += (
-                excess_variables[
-                    "{}|{}_commodity{}".format(c1.source, c1.target, c1_id)
-                ]
-                == excess_variables[
-                    "{}|{}_commodity{}".format(c2.source, c2.target, c2_id)
-                ],
+                excess_variables["{}|{}_commodity{}".format(c1.source, c1.target,
+                                                            c1_id)] == excess_variables["{}|{}_commodity{}".format(
+                                                                c2.source, c2.target, c2_id)],
                 "%s_%s_%s_waypoint" % (c1.source, c1.target, c2.target),
             )
         return prob
@@ -395,8 +376,8 @@ class MCF:
                 if v.name.startswith("Route_"):
                     edge_name = v.name[6:]
                     from_to, commodity = (
-                        edge_name[: edge_name.rindex("_")],
-                        edge_name[edge_name.rindex("_") + 1 :],
+                        edge_name[:edge_name.rindex("_")],
+                        edge_name[edge_name.rindex("_") + 1:],
                     )
                     nodes = from_to.split("|")
                     src, dst = nodes[0], nodes[1]
@@ -437,7 +418,7 @@ class MCF:
             adj = result[c_id]
 
             # decompose flow into paths
-            paths = dfs(adj, [commodity.source], [2 ** 32])
+            paths = dfs(adj, [commodity.source], [2**32])
             # remove length 1 paths
             paths = list(filter(lambda p: len(p[0]) != 1, paths))
 
@@ -476,15 +457,11 @@ class MCF:
             src_wp_paths = all_paths.pop((src, waypoint, commodity1))
             dst_wp_paths = all_paths.pop((waypoint, target, commodity2))
 
-            self.paths[
-                (FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))
-            ] = [
+            self.paths[(FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))] = [
                 (p1[:-1] + p2[2:])[1:-1] for (p1, p2) in zip(src_wp_paths, dst_wp_paths)
             ]
 
-            self.paths_weights[
-                (FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))
-            ] = min(
+            self.paths_weights[(FlowEndpoint.fromString(src), FlowEndpoint.fromString(target))] = min(
                 path_weights[(src, waypoint, commodity1)],
                 path_weights[(waypoint, target, commodity2)],
             )
@@ -519,9 +496,5 @@ class MCF:
         for ((src, dst), paths) in self.paths.items():
             if src is None:
                 continue
-            print(
-                "From {}:{} to {}:{} have {} paths".format(
-                    src.host, src.port, dst.host, dst.port, len(paths)
-                )
-            )
+            print("From {}:{} to {}:{} have {} paths".format(src.host, src.port, dst.host, dst.port, len(paths)))
             print(paths)

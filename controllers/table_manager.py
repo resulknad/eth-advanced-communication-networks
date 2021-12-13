@@ -16,6 +16,7 @@ TYPE_UDP = 0x11
 # the inner lists contain the name of the switches on the path in order.
 Paths = Dict[Tuple[FlowEndpoint, FlowEndpoint], List[List[str]]]
 
+
 class TableManager:
     """Keeps track and maintains virtual circuits on the switches."""
     def __init__(self, topo: NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
@@ -35,9 +36,19 @@ class TableManager:
         self.paths: Dict[str, Paths] = defaultdict(lambda: defaultdict(list))
 
     def replace_base_paths(self, paths: Paths):
+        """Replace the paths for the base traffic with the given paths
+
+        Args:
+            paths (Paths): Paths for the flows in the base traffic
+        """
         self.paths["base"] = paths
 
     def replace_additional_traffic(self, paths: Paths):
+        """Replace the paths for the additional traffic with the given paths
+
+        Args:
+            paths (Paths): Paths for the flows in detected additional traffic
+        """
         self.paths["additional"] = paths
 
     def get_additional_traffic(self) -> Paths:
@@ -58,8 +69,11 @@ class TableManager:
         set_all_paths = to_set(all_paths)
         set_previous_paths = to_set(previous_paths)
 
+        # These don't have to be touched
         same = set_all_paths & set_previous_paths
+        # These need to new newly installed
         added = set_all_paths - set_previous_paths
+        # These must be removed
         removed = set_previous_paths - set_all_paths
 
         # remove paths
@@ -103,7 +117,8 @@ class TableManager:
                 ecmp_group = self.ecmp_group_counters[sw_name]
                 self.ecmp_group_counters[sw_name] += 1
 
-                # install entry in virtual_circuit_path table
+                # install MPLS labels in virtual_circuit_path table
+                # One entry for each possible path
                 for idx, path in enumerate(paths):
                     path_wo_hosts = path[1:-1]
                     print(path, path_wo_hosts)
@@ -171,5 +186,3 @@ class TableManager:
             prev = node
 
         return stack
-
-

@@ -1,19 +1,42 @@
+from typing import List
 from dataclasses import dataclass
+
 from flow_endpoint import FlowEndpoint
+
 
 @dataclass
 class Flow:
-    src: str
-    sport: int
-    dst: str
-    dport: int
-    protocol: str
-    rate: float
-    start_time: float = -1
-    end_time: float = -1
+    """Represents a flow between two hosts in the network.
+    If known, it may have an associated time interval.
+    """
 
+    src: str
+    """Source host name"""
+    sport: int
+    """Source port"""
+    dst: str
+    """Destination host name"""
+    dport: int
+    """Destination port"""
+    protocol: str
+    """Either 'tcp' or 'udp'"""
+    rate: float
+    """Flow rate in Mbps"""
+    start_time: float = -1
+    """Start time relative to simulation start or -1"""
+    end_time: float = -1
+    """End time relative to simulation start or -1"""
     @staticmethod
-    def from_df(df):
+    def from_df(df) -> List['Flow']:
+        """Extracts a list of flows from a pandas DataFrame received from
+        parsing a traffic CSV file.
+
+        Args:
+            df (pandas.DataFrame): Flows encoded as a dataflow
+
+        Returns:
+            list(Flow): The same flows encapsulated in the Flow class
+        """
         res = []
         for (_, f) in df.iterrows():
             res.append(
@@ -35,4 +58,3 @@ class Flow:
 
     def duration(self) -> float:
         return self.end_time - self.start_time
-

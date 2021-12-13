@@ -172,6 +172,12 @@ class Controller(object):
         self.init_heartbeats()
 
     def _prepare_additional_traffic(self):
+        """Initial computation for dynamically handling additional traffic.
+        
+        We compute paths for all additional traffic with bandwidth normalized over the entire time interval.
+        The bandwidth requirements for those paths are subtracted from the network graph to get the residual bandwidth graph.
+        This is an approximation for how much bandwidth is still available. Paths for any additional traffic is computed based on the residual graph.
+        """
         additional_manager = FlowManager(self.g, dataclasses.replace(self.params, normalize_bw_across_time=True),
                                          self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()

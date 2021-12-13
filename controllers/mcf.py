@@ -432,9 +432,7 @@ class MCF:
         all_paths = defaultdict(list)
         path_weights = defaultdict(list)
         # reconstruct paths out of adjencency lists for paths
-        for c_id in range(len(self.commodities)):
-            commodity = self.commodities[c_id]
-
+        for (c_id, commodity) in enumerate(self.commodities):
             # adjacency list for commodity c
             adj = result[c_id]
 
@@ -517,6 +515,7 @@ class MCF:
 
     def print_paths_summary(self):
         """Prints the paths extracted from the solved LP for debugging purposes."""
+        print(f"Path summary for {len(self.paths)} flows")
         for ((src, dst), paths) in self.paths.items():
             if src is None:
                 continue

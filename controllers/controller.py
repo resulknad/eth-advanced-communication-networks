@@ -189,6 +189,18 @@ class FlowManager:
         self._paths = {}
         self._path_weights = {}
 
+        # Flows from base_traffic that are accepted/rejected based on SLAs
+        self.accepted_flows : List[Flow] = []
+        self.rejected_flows : List[Flow] = []
+
+
+        f: Flow
+        for f in base_traffic:
+            if (self._slas_for_flow(f)):
+                self.accepted_flows.append(f)
+            else:
+                self.rejected_flows.append(f)
+
         # compute the time intervals for the MCF problems
         num_intervals = math.ceil(params.TOTAL_TIME / params.MCF_INTERVAL_SIZE)
         # Stores the end-time of each interval
@@ -198,7 +210,7 @@ class FlowManager:
         self.flows_for_interval: Dict[int, List[Flow]] = {}
         start_time = 0
         for end_time in self.intervals:
-            flows = [f for f in base_traffic if (f.start_time < end_time) and (f.end_time >= start_time)]
+            flows = [f for f in self.accepted_flows if (f.start_time < end_time) and (f.end_time >= start_time)]
 
             self.flows_for_interval[end_time] = flows
 
@@ -246,27 +258,26 @@ class FlowManager:
 
             f: Flow
             for f in flows:
-                if self._slas_for_flow(f):
-                    src_fe = f.to_source_endpoint()
-                    dst_fe = f.to_dest_endpoint()
+                src_fe = f.to_source_endpoint()
+                dst_fe = f.to_dest_endpoint()
 
-                    if (src_fe, dst_fe) in flows_to_path:
-                        # flow was already considered in previous timestep
-                        # and we already have a path for it
+                if (src_fe, dst_fe) in flows_to_path:
+                    # flow was already considered in previous timestep
+                    # and we already have a path for it
+                    m.subtract_paths(
+                        flows_to_path[(src_fe, dst_fe)],
+                        flows_to_path_weights[(src_fe, dst_fe)],
+                    )
+
+                    # for TCP flows, we also keep the reverse path for the ACKs
+                    if f.is_tcp():
                         m.subtract_paths(
-                            flows_to_path[(src_fe, dst_fe)],
-                            flows_to_path_weights[(src_fe, dst_fe)],
+                            flows_to_path[(dst_fe, src_fe)],
+                            flows_to_path_weights[(dst_fe, src_fe)],
                         )
-
-                        # for TCP flows, we also keep the reverse path for the ACKs
-                        if f.is_tcp():
-                            m.subtract_paths(
-                                flows_to_path[(dst_fe, src_fe)],
-                                flows_to_path_weights[(dst_fe, src_fe)],
-                            )
-                    else:
-                        # find path for that new flow
-                        FlowManager.add_flow_to_mcf(m, f, interval_length)
+                else:
+                    # find path for that new flow
+                    FlowManager.add_flow_to_mcf(m, f, interval_length)
 
             # add waypoints
             FlowManager.add_waypoints_to_mcf(m, self._get_waypoints())
@@ -297,6 +308,13 @@ class FlowManager:
             print("[{}, {}] {} flows ({} new paths, {} saved)".format(start_time, end_time, len(flows), len(paths),
                                                                       len(flows_to_path)))
             start_time = end_time
+
+        # For all SLA-rejected flows, add an empty path list
+        for f in self.rejected_flows:
+            src = f.to_source_endpoint()
+            dst = f.to_dest_endpoint()
+            flows_to_path[(src, dst)] = []
+            flows_to_path_weights[(src, dst)] = []
 
         self._paths = flows_to_path
         self._path_weights = flows_to_path_weights

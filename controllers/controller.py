@@ -38,23 +38,23 @@ TYPE_MPLS = 0x8847
 # These parameters allow to fine-tune our solution, obtaining different tradeoffs.
 # The parameters are described in detail in parameters.py
 
-params = Parameter(
-    TOTAL_TIME=60,
-    MCF_INTERVAL_SIZE=5,
-    NORMALIZE_BW_ACROSS_TIME=False,
-    TCP_DEFAULT_BW=10,
-    UDP_COST_MULTIPLIER=1,
-    TCP_COST_MULTIPLIER=1,
-    UDP_BW_MULTIPLIER=1,
-    TCP_BW_MULTIPLIER=1,
-    TCP_ACK_BW_MULTIPLIER=0.5,
-    HEARTBEAT_FREQUENCY=0.1,
-    TCP_DURATION_MULTIPLIER=1.5,
-    ADDITIONAL_BW=10,
-    CONTROLLER_FORWARD_MPLS=True,
-    ADDITIONAL_TRAFFIC_PURGE_INTERVAL=1000,
-    ADDITIONAL_TRAFFIC_PURGE=False,
-    SLAS=[
+DEFAULT_PARAMS = Parameter(
+    total_time=60,
+    mcf_interval_size=5,
+    normalize_bw_across_time=False,
+    tcp_default_bw=10,
+    udp_cost_multiplier=1,
+    tcp_cost_multiplier=1,
+    udp_bw_multiplier=1,
+    tcp_bw_multiplier=1,
+    tcp_ack_bw_multiplier=0.5,
+    heartbeat_frequency=0.1,
+    tcp_duration_multiplier=1.5,
+    additional_bw=10,
+    controller_forward_mpls=True,
+    additional_traffic_purge_interval=1000,
+    additional_traffic_purge=False,
+    slas=[
         "fcr_1", # 1--100 TCP 1
         # "prr_2", # 1--100 UDP 0.99
         "fct_3", # 1--100 TCP 20
@@ -94,6 +94,8 @@ params = Parameter(
         "wp_37", # BER_h0 -> LIS_h0 udp MAD
         "wp_38", # LIS_h0 -> BER_h0 udp MAD
     ])
+
+params = deepcopy(DEFAULT_PARAMS)
 
 
 @dataclass
@@ -156,7 +158,7 @@ def preprocess_slas(slas_file):
     df["dport_end"] = dport[1].replace('*', '65535').astype("int32")
 
     # select SLAs that should be considered
-    df = df[df["id"].isin(params.SLAS)]
+    df = df[df["id"].isin(params.slas)]
 
     return df
 
@@ -178,8 +180,8 @@ def preprocess_base_traffic(base_traffic_file):
     rows = df[pd.isna(df["rate"])]
     for i, r in rows.iterrows():
         size = int(r["size"][:-2])
-        df.loc[i, "rate"] = str(params.TCP_DEFAULT_BW) + "Mbps"
-        df.loc[i, "duration"] = (size / params.TCP_DEFAULT_BW) * params.TCP_DURATION_MULTIPLIER
+        df.loc[i, "rate"] = str(params.tcp_default_bw) + "Mbps"
+        df.loc[i, "duration"] = (size / params.tcp_default_bw) * params.tcp_duration_multiplier
 
     # add end_time everywhere
     df["end_time"] = df["start_time"] + df["duration"]
@@ -210,9 +212,9 @@ class FlowManager:
                 self.rejected_flows.append(f)
 
         # compute the time intervals for the MCF problems
-        num_intervals = math.ceil(params.TOTAL_TIME / params.MCF_INTERVAL_SIZE)
+        num_intervals = math.ceil(params.total_time / params.mcf_interval_size)
         # Stores the end-time of each interval
-        self.intervals = [params.MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
+        self.intervals = [params.mcf_interval_size * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
         self.flows_for_interval: Dict[int, List[Flow]] = {}
@@ -343,11 +345,11 @@ class FlowManager:
             interval_length (float): The size of the current interval (where the flow should be added), in seconds
         """
 
-        cost_multiplier = (params.UDP_COST_MULTIPLIER if flow.is_udp() else params.TCP_COST_MULTIPLIER)
-        bw_multiplier = (params.UDP_BW_MULTIPLIER if flow.is_udp() else params.TCP_BW_MULTIPLIER)
+        cost_multiplier = (params.udp_cost_multiplier if flow.is_udp() else params.tcp_cost_multiplier)
+        bw_multiplier = (params.udp_bw_multiplier if flow.is_udp() else params.tcp_bw_multiplier)
 
         bw = flow.rate * bw_multiplier
-        if params.NORMALIZE_BW_ACROSS_TIME:
+        if params.normalize_bw_across_time:
             bw *= flow.duration() / interval_length
 
         src_fe = flow.to_source_endpoint()
@@ -358,7 +360,7 @@ class FlowManager:
             dst_fe,
             bw,
             cost_multiplier=cost_multiplier,
-            add_on_conflict=params.NORMALIZE_BW_ACROSS_TIME,
+            add_on_conflict=params.normalize_bw_across_time,
         )
 
         # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
@@ -366,8 +368,8 @@ class FlowManager:
             mcf.add_flow(
                 dst_fe,
                 src_fe,
-                bw * params.TCP_ACK_BW_MULTIPLIER,
-                add_on_conflict=params.NORMALIZE_BW_ACROSS_TIME,
+                bw * params.tcp_ack_bw_multiplier,
+                add_on_conflict=params.normalize_bw_across_time,
             )
 
     def _slas_for_flow(self, flow):
@@ -594,7 +596,7 @@ class Controller(object):
         self.filtered_slas = preprocess_slas(slas_file)
         self.base_traffic = preprocess_base_traffic(base_traffic_file)
         self.flow_manager = FlowManager(self.g, params, self.base_traffic, self.filtered_slas)
-        self.additional_manager : FlowManager = None # FlowManager for additional traffic
+        self.additional_manager: FlowManager = None # FlowManager for additional traffic
         self.paths_manager = PathManager(self.topo, self.controllers)
 
         self.flow_manager.compute_paths_mcf()
@@ -604,12 +606,12 @@ class Controller(object):
 
     def _prepare_additional_traffic(self):
         self.additional_traffic_params = deepcopy(params)
-        self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = True
+        self.additional_traffic_params.normalize_bw_across_time = True
         additional_manager = FlowManager(self.g, self.additional_traffic_params, self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
         # For the flow computations for the additional traffic, we don't want to normalize and we only want a single interval
-        self.additional_traffic_params.NORMALIZE_BW_ACROSS_TIME = False
-        self.additional_traffic_params.MCF_INTERVAL_SIZE = self.additional_traffic_params.TOTAL_TIME
+        self.additional_traffic_params.normalize_bw_across_time = False
+        self.additional_traffic_params.mcf_interval_size = self.additional_traffic_params.total_time
 
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
@@ -638,7 +640,7 @@ class Controller(object):
         self._set_mirroring_sessions()
 
         # initiate the heartbeat messages
-        self._heartbeat(params.HEARTBEAT_FREQUENCY)
+        self._heartbeat(params.heartbeat_frequency)
         print("started sending heartbeats")
 
         # Sniff the traffic coming from switches
@@ -722,7 +724,7 @@ class Controller(object):
             dport = udp.dport
 
             # TODO use actual time values (also add option to set default length of additional traffic)
-            flow = Flow(src, sport, dst, dport, "udp", params.ADDITIONAL_BW, 0, 1)
+            flow = Flow(src, sport, dst, dport, "udp", params.additional_bw, 0, 1)
 
             if flow not in self.additional_udp:
                 print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
@@ -741,7 +743,7 @@ class Controller(object):
             # the controller. We can choose to manually create the MPLS header
             # stack + select the ECMP group in the controller and forward it to
             # the correct next hop.
-            if params.CONTROLLER_FORWARD_MPLS:
+            if params.controller_forward_mpls:
                 src_fe = flow.to_source_endpoint()
                 dst_fe = flow.to_dest_endpoint()
 
@@ -802,7 +804,7 @@ class Controller(object):
 
     def run(self):
         """Run function"""
-        if params.ADDITIONAL_TRAFFIC_PURGE:
+        if params.additional_traffic_purge:
             threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
         self.paths_manager.replace_base_paths(self.flow_manager.paths)
@@ -811,7 +813,7 @@ class Controller(object):
     def reset_thread(self):
         """Thread to periodically reset additional traffic paths"""
         while True:
-            time.sleep(params.ADDITIONAL_TRAFFIC_PURGE_INTERVAL)
+            time.sleep(params.additional_traffic_purge_interval)
             print("Resetting all additional traffic")
             self.additional_udp = []
             self.paths_manager.replace_additional_traffic({})

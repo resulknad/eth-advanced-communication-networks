@@ -14,6 +14,12 @@
 
 #define FAILURE_THRESHOLD 48w500000 // 0.5s # WARNING: must be bigger than heartbeat frequency.
 
+// Disable additional traffic by default
+#define DO_ADDITIONAL 0
+#ifndef DO_ADDITIONAL
+#define DO_ADDITIONAL 1
+#endif
+
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -137,6 +143,7 @@ control MyIngress(inout headers hdr,
         actions = {
             ecmp_group;
             no_action;
+            drop;
         }
         default_action = no_action;
         size = 256;
@@ -154,9 +161,9 @@ control MyIngress(inout headers hdr,
         }
         actions = {
             set_nhop;
-            drop;
+            no_action;
         }
-        default_action = drop;
+        default_action = no_action;
         size = 256;
     }
 
@@ -1085,7 +1092,7 @@ control MyIngress(inout headers hdr,
             drop;
         }
         default_action = drop;
-        size = 256;
+        size = 1024;
     }
     action mpls_forward(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
@@ -1233,12 +1240,23 @@ control MyIngress(inout headers hdr,
                 get_random_flowlet_id();
             }
 
-            if (virtual_circuit.apply().hit) {
-                virtual_circuit_path.apply();
-            } else {
-                ipv4_lpm.apply();
+            switch (virtual_circuit.apply().action_run) {
+                ecmp_group: {
+                    virtual_circuit_path.apply();
+                }
+                no_action: {
+                   if (!ipv4_lpm.apply().hit) {
+#if DO_ADDITIONAL
+                       // This is additional traffic that does not yet have a path allocated
+                       // We send it to the controller so that it can set up paths.
+                       if (hdr.udp.isValid() && hdr.udp.srcPort > 60000) {
+                           clone(CloneType.I2E, 100);
+                       }
+                       drop();
+#endif
+                   }
+                }
             }
-
         }
 
         // handle MPLS packets (note that they may have just become MPLS packets by applying the tables above)

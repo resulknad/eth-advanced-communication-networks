@@ -1,0 +1,6 @@
+src,dst,sport,dport,protocol,rate,size,duration,start_time
+MAN_h0,FRA_h0,61477,61373,udp,1Mbps,,1,10
+EIN_h0,MAD_h0,60559,62723,udp,1Mbps,,1,49
+MAN_h0,LIS_h0,64779,64690,udp,1Mbps,,1,12
+GLO_h0,REN_h0,60895,61399,udp,1Mbps,,1,16
+GLO_h0,BRI_h0,60935,62125,udp,1Mbps,,1,14

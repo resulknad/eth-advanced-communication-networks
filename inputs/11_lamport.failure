@@ -1,0 +1,4 @@
+src_switch, dst_switch, failure_time, duration
+LON, LIS, 5, 5
+LON, LIS, 40, 10
+ADDED_3,, 25, 10

@@ -3,6 +3,7 @@ class Edge:
     source = ""
     delay = ""
     bw = ""
+
     def __init__(self, source, target, delay, bw):
         self.source = source
         self.target = target

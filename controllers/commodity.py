@@ -10,9 +10,7 @@ class Commodity:
     cost_multiplier: float
 
     def __repr__(self):
-        return "{}:{}:{}:{}".format(
-            self.source, self.target, self.demand, self.cost_multiplier
-        )
+        return "{}:{}:{}:{}".format(self.source, self.target, self.demand, self.cost_multiplier)
 
     def is_empty(self):
         return self.source == "" or self.target == ""

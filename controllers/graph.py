@@ -30,7 +30,7 @@ class Graph:
                 source = l["node1"]
                 target = l["node2"]
                 delay = float(l.get("delay", "0ms")[:-2])
-                bw = l.get("bw", 2 ** 32)
+                bw = l.get("bw", 2**32)
                 self.add_undirected_edge(source, target, delay, bw)
 
     def add_undirected_edge(self, source, target, delay, bw):
@@ -46,11 +46,8 @@ class Graph:
             bool: successful or not
         """
         if source not in self.nodes or target not in self.nodes:
-            print(
-                "WARNING: either source or target node does not exist, cannot add edge {} - {}".format(
-                    source, target
-                )
-            )
+            print("WARNING: either source or target node does not exist, cannot add edge {} - {}".format(
+                source, target))
             return False
 
         e = Edge(source, target, delay, bw)
@@ -104,7 +101,7 @@ class Graph:
         to stdout if an edge has less than weight bandwidth / capacity left.
 
         Args:
-            path (list(string)): list of nodestrings
+            path (list(str)): list of nodestrings
             weight (float): weight of the path
 
         Returns:
@@ -113,9 +110,7 @@ class Graph:
         for (n1, n2) in zip(path, path[1:]):
             e = self.get_edge(n1, n2)
             if e is None:
-                print(
-                    "WARNIING: cannot subtract path because edge does not exist", n1, n2
-                )
+                print("WARNIING: cannot subtract path because edge does not exist", n1, n2)
                 return False
             if e.bw - weight < 0:
                 print(

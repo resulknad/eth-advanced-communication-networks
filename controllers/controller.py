@@ -1,45 +1,53 @@
 import argparse
-from collections import defaultdict
 import threading
-import math
 import time
-from scapy.all import sniff, Ether, raw
-import pandas as pd
 import struct
+import dataclasses
+import random
+import socket
+from copy import deepcopy
+from typing import Dict, List
 
-from typing import Dict
+from scapy.all import sniff, Ether, raw, UDP, IP
+from scapy.contrib.mpls import MPLS
+
+import pandas as pd
 
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 
 from graph import Graph
-from mcf import MCF
-from flow_endpoint import FlowEndpoint
 from heartbeat_generator import HeartBeatGenerator, TYPE_HEARTBEAT
+from parameters import Parameter
+from flow import Flow
+from table_manager import TableManager
+from flow_manager import FlowManager
 
-TYPE_TCP = 0x6
-TYPE_UDP = 0x11
-TOTAL_TIME = 60  # seconds
+# Ethernet protocol field values
+TYPE_IPV4 = 0x800
+TYPE_MPLS = 0x8847
 
 # ============================== TUNABLE PARAMETERS ==============================
 # These parameters allow to fine-tune our solution, obtaining different tradeoffs.
-# The parameters are described in detail in the README.
+# The parameters are described in detail in parameters.py
 
-MCF_INTERVAL_SIZE = 5  # seconds
-NORMALIZE_BW_ACROSS_TIME = False
-TCP_DEFAULT_BW = 10 # Mbps
-UDP_COST_MULTIPLIER = 1
-TCP_COST_MULTIPLIER = 1
-UDP_BW_MULTIPLIER = 1
-TCP_BW_MULTIPLIER = 1
-TCP_ACK_BW_MULTIPLIER = 0.5
-HEARTBEAT_FREQUENCY = 0.1   # seconds
-TCP_DURATION_MULTIPLIER = 1.5
-
-# ============================== SLA SELECTION ===================================
-# These parameters allow to select the SLAs that should be considered.
-# They are described in more detail in the README.
-FILTER_INCLUDE_SLA_BY_NAME = [
+DEFAULT_PARAMS = Parameter(
+    total_time=60,
+    mcf_interval_size=5,
+    normalize_bw_across_time=False,
+    tcp_default_bw=10,
+    udp_cost_multiplier=1,
+    tcp_cost_multiplier=1,
+    udp_bw_multiplier=1,
+    tcp_bw_multiplier=1,
+    tcp_ack_bw_multiplier=0.5,
+    heartbeat_frequency=0.1,
+    tcp_duration_multiplier=1.5,
+    additional_traffic_bw=10,
+    controller_forward_mpls=True,
+    additional_traffic_purge_interval=5,
+    additional_traffic_purge=False,
+    slas=[
         "fcr_1", # 1--100 TCP 1
         # "prr_2", # 1--100 UDP 0.99
         "fct_3", # 1--100 TCP 20
@@ -78,285 +86,116 @@ FILTER_INCLUDE_SLA_BY_NAME = [
         "wp_36", # BRI_h0 -> BAR_h0 udp PAR
         "wp_37", # BER_h0 -> LIS_h0 udp MAD
         "wp_38", # LIS_h0 -> BER_h0 udp MAD
-        ]
+    ])
+
+
+def preprocess_slas(slas_file, params: Parameter):
+    """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
+    out the SLAs that should not be considered. Returns the remaining SLAs (to be considered) as a DataFrame.
+
+    Args:
+        slas_file (str): Path to the SLA csv file
+        params (Parameter): Tunable parameter object
+
+    Returns:
+        list(pandas.Series): The processed and filtered SLAs
+
+    """
+    # read SLAs
+    df = pd.read_csv(slas_file)
+    df = df.rename(columns=lambda x: x.strip())
+
+    sport = df["sport"].str.split("--", n=1, expand=True)
+    df["sport_start"] = sport[0].replace('*', '0').astype("int32")
+    df["sport_end"] = sport[1].replace('*', '65535').astype("int32")
+
+    dport = df["dport"].str.split("--", n=1, expand=True)
+    df["dport_start"] = dport[0].replace('*', '0').astype("int32")
+    df["dport_end"] = dport[1].replace('*', '65535').astype("int32")
+
+    # select SLAs that should be considered
+    df = df[df["id"].isin(params.slas)]
+
+    return df
+
+
+def preprocess_base_traffic(base_traffic_file, params: Parameter):
+    """Reads the base traffic file and transforms size-based (TCP) flows to bandwidth/duration-based flows.
+
+    Args:
+        slas_file (str): Path to the base traffic csv file
+        params (Parameter): Tunable parameter object
+
+    Returns:
+        List[Flow]: List of flows representing the base traffic
+    """
+    # read base traffic
+    df = pd.read_csv(base_traffic_file)
+    df = df.rename(columns=lambda x: x.strip())
+
+    # map flows defined in terms of size to (bandwidth, duration) pairs
+    rows = df[pd.isna(df["rate"])]
+    for i, r in rows.iterrows():
+        size = int(r["size"][:-2])
+        df.loc[i, "rate"] = str(params.tcp_default_bw) + "Mbps"
+        df.loc[i, "duration"] = (size / params.tcp_default_bw) * params.tcp_duration_multiplier
+
+    # add end_time everywhere
+    df["end_time"] = df["start_time"] + df["duration"]
+    return Flow.from_df(df)
 
 
 class Controller(object):
-    def __init__(self, base_traffic, slas):
+    def __init__(self, base_traffic_file, slas_file, params=DEFAULT_PARAMS):
         """Initializes a new controller instance and performs some setup tasks.
 
         Args:
-            base_traffic (str): path to the base traffic file
-            slas (str): path to the SLA file
+            base_traffic_file (str): path to the base traffic file
+            slas_file (str): path to the SLA file
+            params (Parameter): Tunable parameter object
         """
-        self.base_traffic_file = base_traffic
-        self.slas_file = slas
-        self.topo_file = "topology.json"
-        self.topo = load_topo(self.topo_file)
-        self.controllers : Dict[str, SimpleSwitchThriftAPI] = {}
-        self.ecmp_group_counters = defaultdict(int)
+        topo_file = "topology.json"
+        self.topo = load_topo(topo_file)
+        self.g = Graph(topo_file)
+        self.controllers: Dict[str, SimpleSwitchThriftAPI] = {}
+        self.params = params
 
-        self.init_mcf()
+        self.additional_udp: List[Flow] = []
+
+        self.filtered_slas = preprocess_slas(slas_file, self.params)
+        self.base_traffic = preprocess_base_traffic(base_traffic_file, self.params)
+        self.flow_manager = FlowManager(self.g, self.params, self.base_traffic, self.filtered_slas)
+        self.additional_manager: FlowManager = None # FlowManager for additional traffic
+        self.table_manager = TableManager(self.topo, self.controllers)
+
+        self.flow_manager.compute_paths_mcf()
+        self._prepare_additional_traffic()
         self.init_controllers()
         self.init_heartbeats()
 
-    def init_mcf(self):
-        """Performs some initialization work for computing paths using multi-commodity flow problems. In particular,
-        preprocesses SLAs and base traffic, creates a topology graph, computes intervals, and stores a map from intervals to flows.
-        It then computes paths for all intervals for the initial topology (no failures).
+    def _prepare_additional_traffic(self):
+        """Initial computation for dynamically handling additional traffic.
+        
+        To accommodate additional traffic, we first (approximately) estimate how much bandwidth is still available.
+        For this approximation, we normalize the bandwidth of the installed (base traffic) paths over the entire time interval.
+        Using these normalized bandwidths, we create the (bandwidth) residual graph, which serves as the basis for
+        computing paths for the additional traffic.
         """
-        # read topology
-        self.g = Graph(self.topo_file)
+        # For the flow computations for the additional traffic, we do not normalize and we only want a single interval
+        self.additional_traffic_params = dataclasses.replace(self.params,
+                                                             normalize_bw_across_time=False,
+                                                             mcf_interval_size=self.params.total_time)
 
-        self._preprocess_slas()
-        df = self._preprocess_base_traffic()
+        # Compute normalized bandwidths
+        additional_manager = FlowManager(self.g, dataclasses.replace(self.additional_traffic_params, normalize_bw_across_time=True),
+                                         self.base_traffic, self.filtered_slas)
+        additional_manager.compute_paths_mcf()
 
-        # compute the time intervals for the MCF problems
-        num_intervals = math.ceil(TOTAL_TIME / MCF_INTERVAL_SIZE)
-        # Stores the end-time of each interval
-        self.intervals = [MCF_INTERVAL_SIZE * i for i in range(1, num_intervals + 1)]
+        # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
+        self.additional_traffic_graph = deepcopy(self.g)
 
-        # compute and store flows for each interval
-        self.flows_for_interval = {}
-        start_time = 0
-        for end_time in self.intervals:
-            flows = df[
-                (df["start_time"] < end_time) & (df["end_time"] >= start_time)
-            ]
-
-            self.flows_for_interval[end_time] = flows
-
-            print(
-                "Have {} flows from {} to {}".format(
-                    flows.shape[0], start_time, end_time
-                )
-            )
-
-            start_time = end_time
-
-        self._compute_paths_mcf()
-
-    def _preprocess_base_traffic(self):
-        """Reads the base traffic file and transforms size-based (TCP) flows to bandwidth/duration-based flows.
-
-        Returns:
-            pandas.DataFrame: a DataFrame containing the transformed base traffic
-        """
-        # read base traffic
-        df = pd.read_csv(self.base_traffic_file)
-        df = df.rename(columns=lambda x: x.strip())
-
-        # map flows defined in terms of size to (bandwidth, duration) pairs
-        rows = df[pd.isna(df["rate"])]
-        for i, r in rows.iterrows():
-            size = int(r["size"][:-2])
-            df.loc[i, "rate"] = str(TCP_DEFAULT_BW) + "Mbps"
-            df.loc[i, "duration"] = (size / TCP_DEFAULT_BW) * TCP_DURATION_MULTIPLIER
-
-        # add end_time everywhere
-        df["end_time"] = df["start_time"] + df["duration"]
-        return df
-
-    def _preprocess_slas(self):
-        """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
-        out the SLAs that should not be considered. The remaining SLAs (to be considered) are stored as a DataFrame attribute.
-        """
-        # read SLAs
-        df = pd.read_csv(self.slas_file)
-        df = df.rename(columns=lambda x: x.strip())
-
-        sport = df["sport"].str.split("--", n=1, expand=True)
-        df["sport_start"] = sport[0].replace('*', '0').astype("int32")
-        df["sport_end"] = sport[1].replace('*', '65535').astype("int32")
-
-        dport = df["dport"].str.split("--", n=1, expand=True)
-        df["dport_start"] = dport[0].replace('*', '0').astype("int32")
-        df["dport_end"] = dport[1].replace('*', '65535').astype("int32")
-
-        # select SLAs that should be considered
-        df = df[df["id"].isin(FILTER_INCLUDE_SLA_BY_NAME)]
-        self.filtered_slas = df
-
-    def _compute_paths_mcf(self, failures=None):
-        """Computes paths by solving a multi-commodity flow problem for each time interval, taking into account a list of failed links.
-        The paths are stored as an attribute.
-        Note: self.init_mcf() should have been called once beforehand.
-
-        Args:
-            failures (list(tuple(str, str)), optional): List of failed links, given as pairs of switch names.
-        """
-        st = time.time()
-
-        if failures is None:
-            failures = []
-
-        flows_to_path = defaultdict(list)
-        flows_to_path_weights = defaultdict(list)
-
-        start_time = 0
-        for end_time in self.intervals:
-            flows = self.flows_for_interval[end_time]
-            m = MCF(self.g)
-
-            # remove failed links
-            for n1, n2 in failures:
-                m.remove_failed_link(n1, n2)
-
-            interval_length = end_time - start_time
-
-            for (_, f) in flows.iterrows():
-                if self._slas_for_flow(
-                    f["src"], f["sport"], f["dst"], f["dport"], f["protocol"]
-                ):
-                    src_fe = FlowEndpoint(
-                        host=f["src"], port=f["sport"], protocol=f["protocol"]
-                    )
-                    dst_fe = FlowEndpoint(
-                        host=f["dst"], port=f["dport"], protocol=f["protocol"]
-                    )
-
-                    if (src_fe, dst_fe) in flows_to_path:
-                        # flow was already considered in previous timestep
-                        # and we already have a path for it
-                        m.subtract_paths(
-                            flows_to_path[(src_fe, dst_fe)],
-                            flows_to_path_weights[(src_fe, dst_fe)],
-                        )
-
-                        # for TCP flows, we also keep the reverse path for the ACKs
-                        if f["protocol"] == "tcp":
-                            m.subtract_paths(
-                                flows_to_path[(dst_fe, src_fe)],
-                                flows_to_path_weights[(dst_fe, src_fe)],
-                            )
-                    else:
-                        # find path for that new flow
-                        self._add_flow_to_mcf(m, src_fe, dst_fe, f, interval_length)
-
-            # add waypoints
-            wps = self._get_waypoints()
-            for (src, target, wp, protocol) in wps:
-                m.add_waypoint_to_all(src, target, wp, protocol)
-
-            # solve the LP
-            excess = m.make_and_solve_lp()
-
-            if excess > 0:
-                print(
-                    "WARNING: could not satisfy all of the LP constraints! (excess: {})".format(
-                        excess
-                    )
-                )
-            m.print_paths_summary()
-
-            paths, weights = m.get_paths_and_weights()
-            for (src, dst) in paths:
-                if src is None:
-                    continue
-                if (src, dst) in flows_to_path:
-                    print(
-                        "WARNING: got a duplicate flow pair when setting up MCF",
-                        (src, dst),
-                        start_time,
-                        end_time,
-                    )
-                flows_to_path[(src, dst)].extend(paths[(src, dst)])
-                flows_to_path_weights[(src, dst)].extend(weights[(src, dst)])
-            print(
-                "Have {} flows from {} to {} ({} new paths, {} saved)".format(
-                    flows.shape[0], start_time, end_time, len(paths), len(flows_to_path)
-                )
-            )
-            start_time = end_time
-
-        self.paths = flows_to_path
-
-        et = time.time()
-        print(f"Computing new paths took {et - st}", flush=True)
-
-    def _slas_for_flow(self, from_host, from_port, to_host, to_port, protocol):
-        """Returns all SLAs that apply to a given flow.
-
-        This does not include the waypoint SLAs.
-
-        Args:
-            from_host (str): The src host of the flow
-            from_port (str): The src port of the flow
-            to_host (str): The dst host of the flow
-            to_port (str): The dst port of the flow
-            protocol (str): The protocol of the flow
-
-        Returns:
-            list(pandas.Series): The SLAs that apply to the given flow
-        """
-        relevant_slas = []
-        for (_, sla) in self.filtered_slas.iterrows():
-            src_match = sla.src == "*" or sla.src == from_host
-            src_port_match = sla.sport_start <= from_port <= sla.sport_end
-            dst_match = sla.dst == "*" or sla.dst == to_host
-            dst_port_match = sla.dport_start <= to_port <= sla.dport_end
-
-            if (
-                sla.type != "wp"
-                and src_match
-                and src_port_match
-                and dst_match
-                and dst_port_match
-                and sla.protocol == protocol
-            ):
-                relevant_slas.append(sla)
-        return relevant_slas
-
-    def _get_waypoints(self):
-        """Returns the waypoint SLAs from the filtered SLAs
-
-        Returns:
-            list(tuple(str, str, str, str)): The waypoint SLAs as a list of (src, target, wp, protocol) tuples
-        """
-        df = self.filtered_slas
-
-        wps = df[df["type"] == "wp"]
-        return wps[["src", "dst", "target", "protocol"]].values.tolist()
-
-    def _add_flow_to_mcf(self, mcf, src_fe, dst_fe, flow, interval_length):
-        """Adds a flow to the given MCF problem. Cost and bandwidth are adjusted depending on tunable parameters.
-        For TCP flows, an additional reverse flow is added to allow ACKs to be delivered.
-
-        Args:
-            mcf (MCF): The MCF problem instance
-            src_fe (FlowEndpoint): The src flow endpoint
-            dst_fe (FlowEndpoint): The dst flow endpoint
-            flow (pandas.Series): The row in the traffic DataFrame corresponding to the flow
-            interval_length (float): The size of the current interval (where the flow should be added), in seconds
-        """
-
-        cost_multiplier = (
-            UDP_COST_MULTIPLIER if flow["protocol"] == "udp" else TCP_COST_MULTIPLIER
-        )
-        bw_multiplier = (
-            UDP_BW_MULTIPLIER if flow["protocol"] == "udp" else TCP_BW_MULTIPLIER
-        )
-
-        bw = float(flow["rate"][:-4]) * bw_multiplier
-        if NORMALIZE_BW_ACROSS_TIME:
-            bw *= (flow["end_time"] - flow["start_time"]) / interval_length
-
-        mcf.add_flow(
-            src_fe,
-            dst_fe,
-            bw,
-            cost_multiplier=cost_multiplier,
-            add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
-        )
-
-        # for TCP flows, we also need a path from dst to src for the acks (with lower bw)
-        if flow["protocol"] == "tcp":
-            mcf.add_flow(
-                dst_fe,
-                src_fe,
-                bw * TCP_ACK_BW_MULTIPLIER,
-                add_on_conflict=NORMALIZE_BW_ACROSS_TIME,
-            )
+        for path, weight in [(additional_manager.paths[k], additional_manager.path_weights[k]) for k in additional_manager.paths]:
+            self.additional_traffic_graph.subtract_path(path, weight)
 
     def init_controllers(self):
         """Basic initialization. Connects to switches and resets state."""
@@ -379,7 +218,7 @@ class Controller(object):
         self._set_mirroring_sessions()
 
         # initiate the heartbeat messages
-        self._heartbeat(HEARTBEAT_FREQUENCY)
+        self._heartbeat(self.params.heartbeat_frequency)
         print("started sending heartbeats")
 
         # Sniff the traffic coming from switches
@@ -401,13 +240,12 @@ class Controller(object):
     def _sniff_cpu_ports(self):
         """Sniffs traffic coming from switches"""
         cpu_interfaces = [
-            str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1"))
-            for sw_name in self.controllers
+            str(self.topo.get_cpu_port_intf(sw_name).replace("eth0", "eth1")) for sw_name in self.controllers
         ]
         sniff(iface=cpu_interfaces, prn=self._process_packet)
 
     def _process_packet(self, pkt):
-        """Parses packets sent by the switches to detect failure and recovery notifications.
+        """Parses packets sent by the switches to detect failure and recovery notifications as well as additional traffic.
 
         Args:
             pkt (scapy packet): The packet to process
@@ -454,6 +292,75 @@ class Controller(object):
                         self.failed_links.remove(affected_link)
                         self.link_state_changed(list(self.failed_links))
 
+        elif UDP in packet and packet[UDP].sport > 60000:
+            # This is an additional traffic packet
+            ip = packet[IP]
+            udp = packet[UDP]
+
+            src = self.topo.get_host_name(str(ip.src))
+            sport = udp.sport
+            dst = self.topo.get_host_name(str(ip.dst))
+            dport = udp.dport
+
+            # TODO use actual time values (also add option to set default length of additional traffic)
+            flow = Flow(src, sport, dst, dport, "udp", self.params.additional_traffic_bw, 0, 1)
+
+            if flow not in self.additional_udp:
+                print(f"Detected additional traffic from {src}:{sport} to {dst}:{dport}")
+
+                self.additional_udp.append(flow)
+
+                self.additional_manager = FlowManager(self.additional_traffic_graph, self.additional_traffic_params,
+                                                      self.additional_udp, self.filtered_slas)
+                self.additional_manager.compute_paths_mcf(list(self.failed_links))
+
+                self.table_manager.replace_additional_traffic_paths(self.additional_manager.paths)
+                self.table_manager.trigger_update()
+
+            # While creating the paths for additional traffic, the switch will
+            # have sent a bunch of packets for the same additional traffic to
+            # the controller. We can choose to manually create the MPLS header
+            # stack, select the ECMP group in the controller and send it out
+            # to the next hop on the correct interface of the current switch
+            # (essentially doing the work of the forwarding plane in the
+            # controller for the time until a path is installed on the switch).
+            if self.params.controller_forward_mpls:
+                src_fe = flow.to_source_endpoint()
+                dst_fe = flow.to_dest_endpoint()
+
+                paths = self.table_manager.get_additional_traffic_paths()[(src_fe, dst_fe)]
+                num_paths = len(paths)
+
+                # Manually create the correct MPLS stack and forward the packet
+                if num_paths > 0:
+                    chosen = paths[random.randrange(num_paths)]
+                    labels = self.table_manager._get_mpls_stack(chosen)
+
+                    next_hop = labels[0]
+                    labels = labels[1:]
+
+                    out = packet.copy()
+                    for (i, label) in enumerate(labels):
+                        s = 0 if i < len(labels) - 1 else 1
+
+                        out /= MPLS(label=label, s=s, ttl=ip.ttl - 1)
+
+                    out /= ip
+                    out /= udp
+
+                    out[Ether].type = TYPE_MPLS if labels else TYPE_IPV4
+
+                    out[Ether].src = self.topo.node_to_node_mac(switch_name,
+                                                                self.topo.port_to_node(switch_name, next_hop + 1))
+                    out[Ether].dst = self.topo.node_to_node_mac(self.topo.port_to_node(switch_name, next_hop + 1),
+                                                                switch_name)
+
+                    out_bytes = raw(out)
+
+                    send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+                    send_socket.bind((self.topo.get_interfaces(switch_name)[next_hop], 0))
+                    send_socket.send(out_bytes)
+
     def link_state_changed(self, failures):
         """Callback function that is invoked whenever a link failure or recovery is detected.
         Recomputes the MCF solutions (taking into account the link failures) and installs the new paths.
@@ -465,17 +372,33 @@ class Controller(object):
         print(f"Got a link state change notification! Failures: {failures}", flush=True)
 
         print("Recomputing MCF solution")
-        previous_paths = self.paths
-        self._compute_paths_mcf(failures)
+        self.flow_manager.compute_paths_mcf(failures)
 
         print("Installing new paths")
-        # install new paths
-        self.install_paths(self.paths, previous_paths)
+        self.table_manager.replace_base_traffic_paths(self.flow_manager.paths)
+
+        if self.additional_manager:
+            self.additional_manager.compute_paths_mcf(failures)
+            self.table_manager.replace_additional_traffic_paths(self.additional_manager.paths)
+
+        self.table_manager.trigger_update()
 
     def run(self):
         """Run function"""
+        if self.params.additional_traffic_purge:
+            threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
-        self.install_paths(self.paths)
+        self.table_manager.replace_base_traffic_paths(self.flow_manager.paths)
+        self.table_manager.trigger_update()
+
+    def reset_thread(self):
+        """Thread to periodically reset additional traffic paths"""
+        while True:
+            time.sleep(self.params.additional_traffic_purge_interval)
+            print("Resetting all additional traffic")
+            self.additional_udp = []
+            self.table_manager.replace_additional_traffic_paths({})
+            self.table_manager.trigger_update()
 
     def install_base_table_entries(self):
         """Installs the table entries for basic forwarding operations, namely for forwarding to directly connected hosts
@@ -504,9 +427,7 @@ class Controller(object):
                 port_num = self.topo.node_to_node_port_num(sw_name, neighbor)
                 neighbor_mac = self.topo.node_to_node_mac(neighbor, sw_name)
 
-                print(
-                    f"iface for {sw_name}: port_num: {port_num}, neighbor: {neighbor}, neighbor_mac: {neighbor_mac}"
-                )
+                print(f"iface for {sw_name}: port_num: {port_num}, neighbor: {neighbor}, neighbor_mac: {neighbor_mac}")
 
                 # add rule
                 print(f"table_add at {sw_name}")
@@ -523,129 +444,6 @@ class Controller(object):
                     [neighbor_mac, str(port_num)],
                 )
 
-    def install_paths(self, all_paths, previous_paths={}):
-        """Installs paths on the ingress switches such that they add the correct MPLS header stacks to packets.
-        Takes into account the previous paths (which are already installed on the switches) to minimize the number of table operations.
-
-        Args:
-            all_paths (dict): (All) paths that should be installed on the switches
-            previous_paths (dict): The paths that are already installed on the switches
-        """
-        st = time.time()
-
-        to_set = lambda ps: set(map(lambda x: (x[0], str(x[1])), ps.items()))
-        set_all_paths = to_set(all_paths)
-        set_previous_paths = to_set(previous_paths)
-
-        same = set_all_paths & set_previous_paths
-        added = set_all_paths - set_previous_paths
-        removed = set_previous_paths - set_all_paths
-
-        # remove paths
-        for key, _ in removed:
-            paths = previous_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
-            (src_fe, dst_fe) = key
-            src_ip = self.topo.get_host_ip(src_fe.host)
-            dst_ip = self.topo.get_host_ip(dst_fe.host)
-
-            # TODO: We do not remove the paths from table virtual_circuit_paths.
-            # This may not be a big problem, but the tables do grow in size (and might overflow if there are many failures).
-
-            # delete entry from virtual_circuit table
-            print(f"table_delete at {sw_name}")
-            self.controllers[sw_name].table_delete_match(
-                "virtual_circuit",
-                [
-                    str(src_ip),
-                    str(dst_ip),
-                    str(src_fe.port),
-                    str(dst_fe.port),
-                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
-                ],
-            )
-
-        print("done removing circuits")
-
-        # add paths
-        for key, _ in added:
-            paths = all_paths[key]
-
-            if len(paths) == 0:
-                print("WARNING: empty list of paths passed, skipping")
-                continue
-
-            sw_name = paths[0][1]
-
-            (src_fe, dst_fe) = key
-            src_ip = self.topo.get_host_ip(src_fe.host)
-            dst_ip = self.topo.get_host_ip(dst_fe.host)
-
-            # install entry in virtual_circuit_path table
-            for idx, path in enumerate(paths):
-                path_wo_hosts = path[1:-1]
-                print(path, path_wo_hosts)
-                labels = self._get_mpls_stack(path_wo_hosts)
-                print(labels)
-                num_hops = len(labels)
-                action_name = f"mpls_ingress_{num_hops}_hop"
-                action_args = list(map(str, labels[::-1]))
-
-                # add rule
-                print(f"table_add at {sw_name}")
-                self.controllers[sw_name].table_add(
-                    "virtual_circuit_path",
-                    action_name,
-                    [str(self.ecmp_group_counters[sw_name]), str(idx)],
-                    action_args,
-                )
-
-            # install entry in virtual_circuit table
-            self.controllers[sw_name].table_add(
-                "virtual_circuit",
-                "ecmp_group",
-                [
-                    str(src_ip),
-                    str(dst_ip),
-                    str(src_fe.port),
-                    str(dst_fe.port),
-                    str(TYPE_TCP if src_fe.protocol == "tcp" else TYPE_UDP),
-                ],
-                [str(self.ecmp_group_counters[sw_name]), str(len(paths))],
-            )
-            self.ecmp_group_counters[sw_name] += 1
-
-        print("done adding circuits")
-
-        et = time.time()
-        print(f"same: {len(same)}, removed: {len(removed)}, added: {len(added)}")
-        print(f"Installing paths took {et - st}", flush=True)
-
-    def _get_mpls_stack(self, path):
-        """
-        Converts the given path into a list of MPLS labels
-
-        Args:
-            path (list(str)): The path as a list of node names
-
-        Returns:
-            list(int): MPLS labels, the first element is the top of the stack
-        """
-        stack = []
-        prev = path[0]
-        for node in path[1:]:
-            port_num = self.topo.node_to_node_port_num(prev, node)
-            stack.append(port_num)
-            prev = node
-
-        return stack
-
     def main(self):
         """Main function"""
         self.run()
@@ -660,12 +458,10 @@ def get_args():
         required=False,
         default="",
     )
-    parser.add_argument(
-        "--slas", help="Path to scenario.slas", type=str, required=False, default=""
-    )
+    parser.add_argument("--slas", help="Path to scenario.slas", type=str, required=False, default="")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
-    controller = Controller(args.base_traffic, args.slas).main()
+    controller = Controller(args.base_traffic, args.slas, DEFAULT_PARAMS).main()

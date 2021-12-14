@@ -194,7 +194,7 @@ class Controller(object):
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
 
-        for path, weight in [(self.additional_manager.paths[k], self.additional_manager.path_weights[k]) for k in self.additional_manager.paths]:
+        for path, weight in [(additional_manager.paths[k], additional_manager.path_weights[k]) for k in additional_manager.paths]:
             self.additional_traffic_graph.subtract_path(path, weight)
 
     def init_controllers(self):

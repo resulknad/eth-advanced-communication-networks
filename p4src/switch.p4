@@ -36,7 +36,10 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
+    // stores the current ids (salts) of the flowlets
     register<bit<ID_WIDTH>>(REGISTER_SIZE) flowlet_to_id;
+
+    // stores timestamp when latest packet of that flowlet was observed
     register<bit<TIMESTAMP_WIDTH>>(REGISTER_SIZE) flowlet_time_stamp;
 
     // stores timestamp of latest heartbeat received on that port
@@ -54,11 +57,11 @@ control MyIngress(inout headers hdr,
     }
 
     /*
-     * Reads the flowlet registers for a tcp flowlet and sets the corresponding metadata fields.
+     * Reads the flowlet registers for a tcp flowlet and stores the values in metadata fields.
+     * Updates the timestamp register for the new packet.
      */
     action read_flowlet_registers_tcp() {
-
-        //compute register index
+        // compute register index
         hash(meta.flowlet_register_index,
             HashAlgorithm.crc16,
             (bit<16>)0,
@@ -99,10 +102,12 @@ control MyIngress(inout headers hdr,
         flowlet_to_id.write((bit<32>)meta.flowlet_register_index, (bit<16>)meta.flowlet_id);
     }
 
-
+    /*
+     * Sets the next hop by assigning the dst MAC address and the correct egress port.
+     * Decreases the IPv4 TTL by 1.
+     */
     action set_nhop(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
-        // TODO: this is not what happens in reality
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
 
         hdr.ethernet.dstAddr = dstAddr;
@@ -111,6 +116,11 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
+    /*
+     * Sets the ecmp_hash and ecmp_group_id metadata fields.
+     * The ecmp_group_id identifies a particular set of paths (all to the same destination),
+     * and the hash is used as an index into this set to select one of those paths.
+     */
     action ecmp_group(bit<14> ecmp_group_id, bit<16> num_nhops){
         // note that we need to extract the ports into metadata fields (conditional on the transport protocol)
         // in the apply { } block because v1model disallows conditionals in actions
@@ -132,6 +142,12 @@ control MyIngress(inout headers hdr,
         meta.ecmp_group_id = ecmp_group_id;
     }
 
+    /*
+     * This is the first table to be applied. It matches on the flow 5-tuple.
+     * - If there are paths installed for the flow, there should be an ecmp_group action entry.
+     * - If there is an explicit rejection for the flow installed, there should be a drop action entry.
+     * - In all other cases, no action is executed.
+     */
     table virtual_circuit {
         key = {
             hdr.ipv4.srcAddr: exact;
@@ -148,12 +164,11 @@ control MyIngress(inout headers hdr,
         default_action = no_action;
         size = 256;
     }
+
     /*
-     * This table is the first one to be applied.
-     * - For directly connected hosts, it should contain the set_nhop action to forward based on IPv4.
-     * - For ingress switches, it should contain the ecmp_group action, which sets the ecmp_group_id (an 
-     *   identifier of the set of paths to a particular destination) and the ecmp_hash (an index into this
-     *   set based on the flow 5-tuple).
+     * This table handles forwarding to directly connected hosts.
+     * - For directly connected hosts, it should contain the set_nhop action to forward based on IPv4 address.
+     * - In all other cases, no action is executed.
      */
     table ipv4_lpm {
         key = {
@@ -167,6 +182,9 @@ control MyIngress(inout headers hdr,
         size = 256;
     }
 
+    /*
+     * The actions below build MPLS header stacks of the appropriate size.
+     */
     action mpls_ingress_1_hop(label_t l1) {
         hdr.ethernet.etherType = TYPE_MPLS;
         hdr.mpls.push_front(1);
@@ -1092,11 +1110,15 @@ control MyIngress(inout headers hdr,
             drop;
         }
         default_action = drop;
-        size = 1024;
+        size = 512;
     }
+
+    /*
+     * This action handles forwarding based on an MPLS label stack of size at least 2.
+     * It pops the outermost MPLS header, sets the correct egress port, and decreases the TTL.
+     */
     action mpls_forward(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
-        // TODO: this is not what happens in reality
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
 
@@ -1106,9 +1128,12 @@ control MyIngress(inout headers hdr,
         hdr.mpls.pop_front(1);
     }
 
+    /*
+     * This action handles forwarding based on the last MPLS label, i.e., with a stack of size 1.
+     * It differs from mpls_forward in that it sets the etherType back to IPv4 and updates the IPv4 TTL.
+     */
     action penultimate(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst
-        // TODO: this is not what happens in reality
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
 
@@ -1123,7 +1148,8 @@ control MyIngress(inout headers hdr,
 
     /*
      * This table handles the forwarding of MPLS packets.
-     * The handling is slightly different for MPLS egress switches, where the last MPLS header is popped.
+     * - For the MPLS egress switches, where the last MPLS header is popped, the penultimate action should be used.
+     * - For all other MPLS switches, the mpls_forward action should be used.
      */
     table mpls_tbl {
         key = {
@@ -1133,23 +1159,32 @@ control MyIngress(inout headers hdr,
         actions = {
             mpls_forward;
             penultimate;
-            NoAction;
+            no_action;
         }
-        default_action = NoAction();
+        default_action = no_action;
         size = CONST_MAX_LABELS * 2;
     }
 
+    /*
+     * This action forwards a heartbeat message received from the controller to the intended adjacent switch.
+     */
     action send_heartbeat(){
-        // we make sure the other switch treats the packet as probe from the other side
+        // we make sure the other switch treats the packet as probe from the other side of the link
         hdr.heartbeat.from_cp = 0;
         standard_metadata.egress_spec = hdr.heartbeat.port;
     }
 
+    /*
+     *  This action reads the ports from the TCP header into the corresponding metadata fields.
+     */
     action get_tcp_ports() {
         meta.srcPort = hdr.tcp.srcPort;
         meta.dstPort = hdr.tcp.dstPort;
     }
 
+    /*
+     *  This action reads the ports from the UDP header into the corresponding metadata fields.
+     */
     action get_udp_ports() {
         meta.srcPort = hdr.udp.srcPort;
         meta.dstPort = hdr.udp.dstPort;
@@ -1182,7 +1217,7 @@ control MyIngress(inout headers hdr,
                     clone3(CloneType.I2E, 100, meta);
                 }
 
-                // still need to send the heartbeat to our neighbor
+                // send the heartbeat to our neighbor
                 send_heartbeat();
 
             } else {
@@ -1213,7 +1248,7 @@ control MyIngress(inout headers hdr,
         // handle non-MPLS packets
         if (hdr.ipv4.isValid() && !hdr.mpls[0].isValid()) {
 
-            // read ports into metadata
+            // read ports into metadata and obtain flowlet id
             if (hdr.tcp.isValid()) {
                 get_tcp_ports();
 
@@ -1222,7 +1257,7 @@ control MyIngress(inout headers hdr,
                     meta.flowlet_time_diff = standard_metadata.ingress_global_timestamp - meta.flowlet_last_stamp;
 
                     // check if a new flowlet starts
-                    if (meta.flowlet_time_diff > FLOWLET_TIMEOUT){
+                    if (meta.flowlet_time_diff > FLOWLET_TIMEOUT) {
                         update_flowlet_id();
                     }
                 }
@@ -1237,9 +1272,12 @@ control MyIngress(inout headers hdr,
                 // avoid undefined behavior (e.g., for ICMP packets)
                 meta.srcPort = 0;
                 meta.dstPort = 0;
+
+                // again, we make every packet its own "flowlet"
                 get_random_flowlet_id();
             }
 
+            // now apply the tables
             switch (virtual_circuit.apply().action_run) {
                 ecmp_group: {
                     virtual_circuit_path.apply();
@@ -1247,7 +1285,7 @@ control MyIngress(inout headers hdr,
                 no_action: {
                    if (!ipv4_lpm.apply().hit) {
 #if DO_ADDITIONAL
-                       // This is additional traffic that does not yet have a path allocated
+                       // This is additional traffic that does not yet have a path installed.
                        // We send it to the controller so that it can set up paths.
                        if (hdr.udp.isValid() && hdr.udp.srcPort > 60000) {
                            clone(CloneType.I2E, 100);
@@ -1276,7 +1314,7 @@ control MyEgress(inout headers hdr,
     apply {
 
         if (hdr.heartbeat.isValid() && standard_metadata.instance_type == 1) {
-            // set failed link flag for the clone we send to the cp
+            // set header fields on the cloned packet that we send to the controller
             hdr.heartbeat.from_switch_to_cpu = 1;
             hdr.heartbeat.link_status = meta.linkState;
             hdr.heartbeat.port = meta.affectedPort;
@@ -1318,7 +1356,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 ***********************  S W I T C H  *******************************
 *************************************************************************/
 
-//switch architecture
+// switch architecture
 V1Switch(
 MyParser(),
 MyVerifyChecksum(),

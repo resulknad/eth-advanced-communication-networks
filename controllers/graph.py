@@ -2,13 +2,15 @@ import json
 from node import Node
 from edge import Edge
 
+INFINITE_BW = 2**32
+
 
 class Graph:
     edges = []
     nodes = {}
 
     def __init__(self, topo_file):
-        """Initializes a graph using the given topo.json file
+        """Initializes a graph using the given json topology file
 
         Args:
             topo_file (str): json file describing the topology
@@ -30,7 +32,7 @@ class Graph:
                 source = l["node1"]
                 target = l["node2"]
                 delay = float(l.get("delay", "0ms")[:-2])
-                bw = l.get("bw", 2**32)
+                bw = l.get("bw", INFINITE_BW)
                 self.add_undirected_edge(source, target, delay, bw)
 
     def add_undirected_edge(self, source, target, delay, bw):
@@ -86,7 +88,7 @@ class Graph:
             bw (float): [description]
 
         Returns:
-            bool: if successful or not
+            bool: successful or not
         """
         e = self.get_edge(n1, n2)
         if e is None:
@@ -97,7 +99,7 @@ class Graph:
         return True
 
     def subtract_path(self, path, weight):
-        """Subtracts for each edge e in the path "weight" much from its capacity / bandwidth. Quits with a warning printed
+        """Subtracts for each edge e in the path "weight" much from its capacity / bandwidth. Returns with a warning printed
         to stdout if an edge has less than weight bandwidth / capacity left.
 
         Args:
@@ -105,7 +107,7 @@ class Graph:
             weight (float): weight of the path
 
         Returns:
-            bool: success
+            bool: successful or not
         """
         for (n1, n2) in zip(path, path[1:]):
             e = self.get_edge(n1, n2)
@@ -129,7 +131,7 @@ class Graph:
             n (dict, optional): Additional information regarding the node. Defaults to None.
 
         Returns:
-            bool: success
+            bool: successful or not
         """
         if name in self.nodes:
             return False

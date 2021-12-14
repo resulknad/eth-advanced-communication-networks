@@ -46,7 +46,7 @@ DEFAULT_PARAMS = Parameter(
     tcp_duration_multiplier=1.5,
     additional_traffic_bw=10,
     controller_forward_mpls=True,
-    additional_traffic_purge_interval=1000,
+    additional_traffic_purge_interval=5,
     additional_traffic_purge=False,
     slas=[
         "fcr_1", # 1--100 TCP 1
@@ -182,20 +182,20 @@ class Controller(object):
         Using these normalized bandwidths, we create the (bandwidth) residual graph, which serves as the basis for
         computing paths for the additional traffic.
         """
-        # Compute normalized bandwidths
-        additional_manager = FlowManager(self.g, dataclasses.replace(self.params, normalize_bw_across_time=True),
-                                         self.base_traffic, self.filtered_slas)
-        additional_manager.compute_paths_mcf()
-
         # For the flow computations for the additional traffic, we do not normalize and we only want a single interval
         self.additional_traffic_params = dataclasses.replace(self.params,
                                                              normalize_bw_across_time=False,
                                                              mcf_interval_size=self.params.total_time)
 
+        # Compute normalized bandwidths
+        additional_manager = FlowManager(self.g, dataclasses.replace(self.additional_traffic_params, normalize_bw_across_time=True),
+                                         self.base_traffic, self.filtered_slas)
+        additional_manager.compute_paths_mcf()
+
         # Residual graph after removing all the traffic allocated to the base traffic (normalized over the entire time range)
         self.additional_traffic_graph = deepcopy(self.g)
 
-        for path, weight in zip(*additional_manager.paths.values(), *additional_manager.path_weights.values()):
+        for path, weight in [(additional_manager.paths[k], additional_manager.path_weights[k]) for k in additional_manager.paths]:
             self.additional_traffic_graph.subtract_path(path, weight)
 
     def init_controllers(self):

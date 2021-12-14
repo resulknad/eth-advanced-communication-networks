@@ -257,9 +257,12 @@ class MCF:
             commodity2_id,
         )
 
-    def make_lp(self):
+    def make_lp(self, use_num_hops_cost=False):
         """This creates a linear program out of the graph and commodities collected in this instance.
         Refer to the README for an explanation of our LP.
+
+        Args:
+            use_num_hops_cost (bool, optional): Use number of hops instead of delay as the cost measure. Defaults to False.
 
         Returns:
             LpProblem: the linear program in all its glory
@@ -272,9 +275,12 @@ class MCF:
 
         commodities_str = list(map(str, range(len(self.commodities))))
         flow_variables = LpVariable.dicts("Flow", (edges_str, commodities_str), 0)
+
+        print("Using {} as the cost measure.".format('num hops' if use_num_hops_cost else 'delay'))
         cost = {
             edge: {
-                commodity: self.graph.edges_map[edge].delay * self.commodities[int(commodity)].cost_multiplier
+                commodity: (1 if use_num_hops_cost else self.graph.edges_map[edge].delay) * \
+                    self.commodities[int(commodity)].cost_multiplier
                 for commodity in commodities_str
             }
             for edge in edges_str
@@ -361,16 +367,17 @@ class MCF:
             )
         return prob
 
-    def make_and_solve_lp(self, verbose=False):
+    def make_and_solve_lp(self, use_num_hops_cost=False, verbose=False):
         """Calls make_lp and then the solver on the linear program. Extracts the paths out of the solution.
 
         Args:
+            use_num_hops_cost (bool, optional): Use number of hops instead of delay as the cost measure. Defaults to False.
             verbose (bool, optional): Defaults to False.
 
         Returns:
             float: Excess, the amount of demanded bandwidth that could not be satisfied.
         """
-        prob = self.make_lp()
+        prob = self.make_lp(use_num_hops_cost)
         prob.solve(PULP_CBC_CMD(msg=0))
 
         if verbose:

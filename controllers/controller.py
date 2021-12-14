@@ -41,6 +41,7 @@ DEFAULT_PARAMS = Parameter(
     udp_bw_multiplier=1,
     tcp_bw_multiplier=1,
     tcp_ack_bw_multiplier=0.5,
+    use_num_hops_cost=False,
     heartbeat_frequency=0.1,
     tcp_duration_multiplier=1.5,
     additional_traffic_bw=10,

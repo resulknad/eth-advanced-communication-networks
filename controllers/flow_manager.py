@@ -135,7 +135,7 @@ class FlowManager:
 
             # solve the LP
             lp_st = time.time()
-            excess = m.make_and_solve_lp()
+            excess = m.make_and_solve_lp(self.params.use_num_hops_cost)
             lp_et = time.time()
             print(f"Solving LP took {lp_et - lp_st}", flush=True)
 

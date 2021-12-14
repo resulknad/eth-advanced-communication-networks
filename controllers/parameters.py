@@ -25,6 +25,8 @@ class Parameter:
     tcp_ack_bw_multiplier: float
     """For TCP flows, a reverse flow is added for the ACKs.
     This reverse flow has bandwidth of the original flow multiplied by this parameter."""
+    use_num_hops_cost: bool
+    """Use number of hops instead of delay as the cost measure for the LP."""
     heartbeat_frequency: float
     """Seconds between heartbeat messages."""
     tcp_duration_multiplier: float

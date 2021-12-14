@@ -1,3 +1,5 @@
+# Mandatory Information
+
 ## Group info
 
 | Group name | 05_Dijkstra |  |  |
@@ -26,24 +28,28 @@ The above approach is complemented by the following techniques:
 
 ## Individual Contributions
 
-In this section, note down 1 or 2 sentences *per team member* outlining everyone's contribution to the project. We want to see that everybody contributed, but you don't need to get into fine details. For example, write who contributed to which feature of your solution, but do *not* write who implemented a particular function. 
-
 ### Lukas Heimes
 
-Contribution(s) of <Full name 1>
+Implemented failure detection/handling and flowlet-like load balancing. Contributed to the MCF approach and detected numerous bugs through careful code reviews.
 
 ### Dan Kluser
 
-Contribution(s) of <Full name 2>
+Devised the MCF approach, formulated the Linear Program and implemented the interval handling. Really, the heart of our solution.
 
 ### Patrick Ziegler
 
-Contribution(s) of <Full name 3>
+Implemented MPLS forwarding as well as the detection and integration of additional traffic flows. Refactored the controller for modularity and extensibility.
 
-## Additional Information
+# Additional Information
 
-### Linear Program Formulation
+## Linear Program Formulation
 
-### Configurable Parameters
+TODO
 
-### Source Files
+## Configurable Parameters
+
+TODO
+
+## Source Files
+
+TODO

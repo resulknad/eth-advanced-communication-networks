@@ -1092,7 +1092,7 @@ control MyIngress(inout headers hdr,
             drop;
         }
         default_action = drop;
-        size = 256;
+        size = 1024;
     }
     action mpls_forward(macAddr_t dstAddr, egressSpec_t port) {
         // set the src mac address as the previous dst

@@ -16,7 +16,7 @@ class MCF:
         """Initializes a new MCF (Multi-Commodity Flow) problem on the graph given in the constructor
 
         Args:
-            graph (Graph): Graph on which the multi commodity flow problem should be solved. Won't be modified.
+            graph (graph.Graph): Graph on which the multi commodity flow problem should be solved. Won't be modified.
         """
         # copy because we will modify graph in here
         self.graph = deepcopy(graph)

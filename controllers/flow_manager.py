@@ -12,11 +12,19 @@ from table_manager import Paths
 
 
 class FlowManager:
-    """Calculates per-interval paths for a given list of traffic and SLAs
+    """Computes per-interval paths for a given list of traffic and SLAs.
     The simulation time is divided into discrete intervals. For each interval,
-    paths for traffic within that interval are searched using a
-    multi-commodity-flow problem."""
-    def __init__(self, graph: Graph, params: Parameter, base_traffic: List[Flow], filtered_slas):
+    paths for traffic within that interval are computed using a multi-commodity
+    flow problem."""
+
+    def __init__(self, graph: Graph, params: Parameter, traffic_flows: List[Flow], filtered_slas):
+        """Initializes a new FlowManager instance.
+
+        Args:
+            graph (Graph): Topology graph object, won't be modified by the FlowManager
+            traffic_flows (List[Flow]): All flows that could potentially be considered
+            filtered_slas (pandas.DataFrame): SLAs that should be considered
+        """
         self.g = deepcopy(graph)
         self.params = params
         self.filtered_slas = filtered_slas
@@ -32,15 +40,16 @@ class FlowManager:
         self.rejected_flows: List[Flow] = []
 
         f: Flow
-        for f in base_traffic:
+        for f in traffic_flows:
             if (self._slas_for_flow(f)):
+                # There is at least one SLA that applies to the flow
                 self.accepted_flows.append(f)
             else:
+                # No SLA applies, so we reject the flow
                 self.rejected_flows.append(f)
 
-        # compute the time intervals for the MCF problems
+        # compute the time intervals for the MCF problems, stored as a list of interval end times
         num_intervals = math.ceil(params.total_time / params.mcf_interval_size)
-        # Stores the end-time of each interval
         self.intervals = [params.mcf_interval_size * i for i in range(1, num_intervals + 1)]
 
         # compute and store flows for each interval
@@ -217,15 +226,13 @@ class FlowManager:
             )
 
     def _slas_for_flow(self, flow):
-        """Returns all SLAs that apply to a given flow.
-
-        This does not include the waypoint SLAs.
+        """Returns all SLAs that apply to a given flow, except for the waypoint SLAs.
 
         Args:
             flow (Flow)
 
         Returns:
-            list(pandas.Series): The SLAs that apply to the given flow
+            list(pandas.Series): The SLAs that apply to the given flow (except waypoint SLAs)
         """
 
         from_host = flow.src

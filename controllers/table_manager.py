@@ -19,7 +19,14 @@ Paths = Dict[Tuple[FlowEndpoint, FlowEndpoint], List[List[str]]]
 
 class TableManager:
     """Keeps track and maintains virtual circuits on the switches."""
+
     def __init__(self, topo: NetworkGraph, controllers: Dict[str, SimpleSwitchThriftAPI]):
+        """Initializes a new TableManager instance.
+
+        Args:
+            topo (NetworkGraph): Topology object
+            controllers (Dict[str, SimpleSwitchThriftAPI]): Dictionary of the controllers for the switches
+        """
         self.topo = topo
         self.controllers = controllers
 
@@ -35,7 +42,7 @@ class TableManager:
         # action will be installed for those flows.
         self.paths: Dict[str, Paths] = defaultdict(lambda: defaultdict(list))
 
-    def replace_base_paths(self, paths: Paths):
+    def replace_base_traffic_paths(self, paths: Paths):
         """Replace the paths for the base traffic with the given paths
 
         Args:
@@ -43,7 +50,7 @@ class TableManager:
         """
         self.paths["base"] = paths
 
-    def replace_additional_traffic(self, paths: Paths):
+    def replace_additional_traffic_paths(self, paths: Paths):
         """Replace the paths for the additional traffic with the given paths
 
         Args:
@@ -51,7 +58,7 @@ class TableManager:
         """
         self.paths["additional"] = paths
 
-    def get_additional_traffic(self) -> Paths:
+    def get_additional_traffic_paths(self) -> Paths:
         return self.paths["additional"]
 
     def trigger_update(self):
@@ -69,11 +76,11 @@ class TableManager:
         set_all_paths = to_set(all_paths)
         set_previous_paths = to_set(previous_paths)
 
-        # These don't have to be touched
+        # These can be left unchanged
         same = set_all_paths & set_previous_paths
-        # These need to new newly installed
+        # These need to be newly installed
         added = set_all_paths - set_previous_paths
-        # These must be removed
+        # These need to be removed
         removed = set_previous_paths - set_all_paths
 
         # remove paths
@@ -169,8 +176,7 @@ class TableManager:
         print(f"Installing paths took {et - st}", flush=True)
 
     def _get_mpls_stack(self, path):
-        """
-        Converts the given path into a list of MPLS labels
+        """Converts the given path into a list of MPLS labels
 
         Args:
             path (list(str)): The path as a list of node names

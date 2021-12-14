@@ -91,10 +91,11 @@ DEFAULT_PARAMS = Parameter(
 
 def preprocess_slas(slas_file, params: Parameter):
     """Reads the SLA file, makes some transformations (dealing with ranges and wildcards), and then filters
-    out the SLAs that should not be considered. The remaining SLAs (to be considered) are stored as a DataFrame attribute.
+    out the SLAs that should not be considered. Returns the remaining SLAs (to be considered) as a DataFrame.
 
     Args:
         slas_file (str): Path to the SLA csv file
+        params (Parameter): Tunable parameter object
 
     Returns:
         list(pandas.Series): The processed and filtered SLAs
@@ -123,6 +124,7 @@ def preprocess_base_traffic(base_traffic_file, params: Parameter):
 
     Args:
         slas_file (str): Path to the base traffic csv file
+        params (Parameter): Tunable parameter object
 
     Returns:
         List[Flow]: List of flows representing the base traffic
@@ -150,9 +152,9 @@ class Controller(object):
         Args:
             base_traffic_file (str): path to the base traffic file
             slas_file (str): path to the SLA file
+            params (Parameter): Tunable parameter object
         """
         topo_file = "topology.json"
-        # read topology
         self.topo = load_topo(topo_file)
         self.g = Graph(topo_file)
         self.controllers: Dict[str, SimpleSwitchThriftAPI] = {}
@@ -164,7 +166,7 @@ class Controller(object):
         self.base_traffic = preprocess_base_traffic(base_traffic_file, self.params)
         self.flow_manager = FlowManager(self.g, self.params, self.base_traffic, self.filtered_slas)
         self.additional_manager: FlowManager = None # FlowManager for additional traffic
-        self.paths_manager = TableManager(self.topo, self.controllers)
+        self.table_manager = TableManager(self.topo, self.controllers)
 
         self.flow_manager.compute_paths_mcf()
         self._prepare_additional_traffic()
@@ -174,14 +176,17 @@ class Controller(object):
     def _prepare_additional_traffic(self):
         """Initial computation for dynamically handling additional traffic.
         
-        We compute paths for all additional traffic with bandwidth normalized over the entire time interval.
-        The bandwidth requirements for those paths are subtracted from the network graph to get the residual bandwidth graph.
-        This is an approximation for how much bandwidth is still available. Paths for any additional traffic is computed based on the residual graph.
+        To accommodate additional traffic, we first (approximately) estimate how much bandwidth is still available.
+        For this approximation, we normalize the bandwidth of the installed (base traffic) paths over the entire time interval.
+        Using these normalized bandwidths, we create the (bandwidth) residual graph, which serves as the basis for
+        computing paths for the additional traffic.
         """
+        # Compute normalized bandwidths
         additional_manager = FlowManager(self.g, dataclasses.replace(self.params, normalize_bw_across_time=True),
                                          self.base_traffic, self.filtered_slas)
         additional_manager.compute_paths_mcf()
-        # For the flow computations for the additional traffic, we don't want to normalize and we only want a single interval
+
+        # For the flow computations for the additional traffic, we do not normalize and we only want a single interval
         self.additional_traffic_params = dataclasses.replace(self.params,
                                                              normalize_bw_across_time=False,
                                                              mcf_interval_size=self.params.total_time)
@@ -286,7 +291,8 @@ class Controller(object):
                         print(f"Link recovery detected: {affected_link}", flush=True)
                         self.failed_links.remove(affected_link)
                         self.link_state_changed(list(self.failed_links))
-        elif UDP in packet and packet[UDP].sport >= 60000:
+
+        elif UDP in packet and packet[UDP].sport > 60000:
             # This is an additional traffic packet
             ip = packet[IP]
             udp = packet[UDP]
@@ -308,25 +314,27 @@ class Controller(object):
                                                       self.additional_udp, self.filtered_slas)
                 self.additional_manager.compute_paths_mcf(list(self.failed_links))
 
-                self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
-                self.paths_manager.trigger_update()
+                self.table_manager.replace_additional_traffic_paths(self.additional_manager.paths)
+                self.table_manager.trigger_update()
 
             # While creating the paths for additional traffic, the switch will
             # have sent a bunch of packets for the same additional traffic to
             # the controller. We can choose to manually create the MPLS header
-            # stack + select the ECMP group in the controller and forward it to
-            # the correct next hop.
+            # stack, select the ECMP group in the controller and send it out
+            # to the next hop on the correct interface of the current switch
+            # (essentially doing the work of the forwarding plane in the
+            # controller for the time until a path is installed on the switch).
             if self.params.controller_forward_mpls:
                 src_fe = flow.to_source_endpoint()
                 dst_fe = flow.to_dest_endpoint()
 
-                paths = self.paths_manager.get_additional_traffic()[(src_fe, dst_fe)]
+                paths = self.table_manager.get_additional_traffic_paths()[(src_fe, dst_fe)]
                 num_paths = len(paths)
 
                 # Manually create the correct MPLS stack and forward the packet
                 if num_paths > 0:
                     chosen = paths[random.randrange(num_paths)]
-                    labels = self.paths_manager._get_mpls_stack(chosen)
+                    labels = self.table_manager._get_mpls_stack(chosen)
 
                     next_hop = labels[0]
                     labels = labels[1:]
@@ -367,21 +375,21 @@ class Controller(object):
         self.flow_manager.compute_paths_mcf(failures)
 
         print("Installing new paths")
-        self.paths_manager.replace_base_paths(self.flow_manager.paths)
+        self.table_manager.replace_base_traffic_paths(self.flow_manager.paths)
 
         if self.additional_manager:
             self.additional_manager.compute_paths_mcf(failures)
-            self.paths_manager.replace_additional_traffic(self.additional_manager.paths)
+            self.table_manager.replace_additional_traffic_paths(self.additional_manager.paths)
 
-        self.paths_manager.trigger_update()
+        self.table_manager.trigger_update()
 
     def run(self):
         """Run function"""
         if self.params.additional_traffic_purge:
             threading.Thread(target=Controller.reset_thread, args=[self]).start()
         self.install_base_table_entries()
-        self.paths_manager.replace_base_paths(self.flow_manager.paths)
-        self.paths_manager.trigger_update()
+        self.table_manager.replace_base_traffic_paths(self.flow_manager.paths)
+        self.table_manager.trigger_update()
 
     def reset_thread(self):
         """Thread to periodically reset additional traffic paths"""
@@ -389,8 +397,8 @@ class Controller(object):
             time.sleep(self.params.additional_traffic_purge_interval)
             print("Resetting all additional traffic")
             self.additional_udp = []
-            self.paths_manager.replace_additional_traffic({})
-            self.paths_manager.trigger_update()
+            self.table_manager.replace_additional_traffic_paths({})
+            self.table_manager.trigger_update()
 
     def install_base_table_entries(self):
         """Installs the table entries for basic forwarding operations, namely for forwarding to directly connected hosts

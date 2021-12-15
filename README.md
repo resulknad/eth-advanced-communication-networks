@@ -42,6 +42,32 @@ Implemented MPLS forwarding as well as the detection and integration of addition
 
 # Additional Information
 
+## Source Files
+
+```
+.
+|-- controllers
+|   |-- parameters.py           // Definition of configurable parameters
+|   |-- controller.py           // Main file for the centralized controller
+|   |-- flow_manager.py         // Computes paths using mcf.py, used by controller.py
+|   |-- table_manager.py        // Installs paths on the switches, used by controller.py
+|   |-- heartbeat_generator.py  // Generates heartbeats for failure detection; copied from Ex. 7
+|   |-- mcf.py                  // Encodes the MCF problem as a LP, solves it and transforms it to paths
+|   |-- commodity.py            // Class definition for a commodity, used by mcf.py
+|   |-- flow_endpoint.py        // Class definition for a flow endpoint, used by mcf.py
+|   |-- flow.py                 // Class definition for a flow in the network
+|   |-- graph.py                // Data structure for representing a network graph
+|   |-- edge.py                 // Edge class used in graph.py
+|   |-- node.py                 // Node class used in graph.py
+|   `-- test_mcf.py             // Testcases for mcf.py
+|-- p4src
+|   |-- include
+|   |   |-- headers.p4          // Packet headers, metadata, and constant definitions
+|   |   `-- parsers.p4          // Parser and deparser for supported headers
+|   `-- switch.p4               // Main dataplane file, used by all switches
+`-- README.md
+```
+
 ## Linear Program Formulation
 ### Mutli-Commodity Flow Problem
 We start by defining what a multi commodity flow problem on a directed graph $`G = (V,E)`$ is.
@@ -201,29 +227,3 @@ TODO
 ### Selecting SLAs
 
 TODO
-
-## Source Files
-
-```
-.
-|-- controllers
-|   |-- parameters.py           // Definition of configurable parameters
-|   |-- controller.py           // Main file for the centralized controller
-|   |-- flow_manager.py         // Computes paths using mcf.py, used by controller.py
-|   |-- table_manager.py        // Installs paths on the switches, used by controller.py
-|   |-- heartbeat_generator.py  // Generates heartbeats for failure detection; copied from Ex. 7
-|   |-- mcf.py                  // Encodes the MCF problem as a LP, solves it and transforms it to paths
-|   |-- commodity.py            // Class definition for a commodity, used by mcf.py
-|   |-- flow_endpoint.py        // Class definition for a flow endpoint, used by mcf.py
-|   |-- flow.py                 // Class definition for a flow in the network
-|   |-- graph.py                // Data structure for representing a network graph
-|   |-- edge.py                 // Edge class used in graph.py
-|   |-- node.py                 // Node class used in graph.py
-|   `-- test_mcf.py             // Testcases for mcf.py
-|-- p4src
-|   |-- include
-|   |   |-- headers.p4          // Packet headers, metadata, and constant definitions
-|   |   `-- parsers.p4          // Parser and deparser for supported headers
-|   `-- switch.p4               // Main dataplane file, used by all switches
-`-- README.md
-```

@@ -63,22 +63,22 @@ This intuiton translates to the following constrained optimization problem to mi
 **Constraints:**
 
 1. **Link capacity:**
-$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v) \cdot d_i \right) \leq c(u,v)`$
+$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v) \right) \leq c(u,v)`$
 
 2. **Flow conservation (transit nodes):**
 $`\forall i \in K: \sum_{w\in V} f_i(u,w) - \sum_{w \in V} f_i(w,u) = 0 \text{ when } u \neq s_i, t_i`$
 
 3. **Flow conservation (source node)**
-$`\forall i \in K: \sum_{w\in V} f_i(s_i,w) - \sum_{w \in V} f_i(w,s_i) = 1`$
+$`\forall i \in K: \sum_{w\in V} f_i(s_i,w) - \sum_{w \in V} f_i(w,s_i) = d_i`$
 
 4. **Flow conservation (sink node)**
-$`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -1`$
+$`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -d_i`$
 
 
-If we require integer flows, so $`f_i: E \rightarrow \{0,1\}`$, then the MCF problem is NP-complete. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, the problem can be solved in polynomial time using linear programming.
+If we constrain our solutions to have one single flow per commodity, so $`f_i: E \rightarrow \{0,d_i\}`$, then the MCF problem is NP-complete. This is referred to as the decision version of the problem. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, so $`f_i: E \rightarrow [0,d_i]`$, the problem can be solved in polynomial time using linear programming.
 
 ### Linear Program (LP)
-The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional.
+The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional. Note that for any feasible solution, for all commodities $`i`$ and all edges $`e`$ we have $`f_i(e) = f_i(u,v) \leq d_i`$ by constraint (2,3 and 4). The intuition here is that if the flow were larger at any point, then it would also have to be larger everywhere in the flow (flow conservation) and thus also at the source and sink where it would violate both constraints 3 and 4.
 
 The number of constraints and variables is in $`O(k\cdot m)`$ where $`m`$ is the number of edges and $`k`$ the number of commodities.
 

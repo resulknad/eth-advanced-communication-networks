@@ -63,7 +63,7 @@ This intuiton translates to the following constrained optimization problem to mi
 **Constraints:**
 
 1. **Link capacity:**
-$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v)\right) \leq c(u,v)`$
+$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v) \cdot d_i \right) \leq c(u,v)`$
 
 2. **Flow conservation (transit nodes):**
 $`\forall i \in K: \sum_{w\in V} f_i(u,w) - \sum_{w \in V} f_i(w,u) = 0 \text{ when } u \neq s_i, t_i`$
@@ -75,7 +75,7 @@ $`\forall i \in K: \sum_{w\in V} f_i(s_i,w) - \sum_{w \in V} f_i(w,s_i) = 1`$
 $`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -1`$
 
 
-If we require integer flows, so $`f_i: E \rightarrow N`$, then the MCF problem is NP-complete. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, the problem can be solve in polynomial time using linear programming.
+If we require integer flows, so $`f_i: E \rightarrow \{0,1\}`$, then the MCF problem is NP-complete. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, the problem can be solved in polynomial time using linear programming.
 
 ### Linear Program (LP)
 The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional.

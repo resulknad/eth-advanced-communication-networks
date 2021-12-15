@@ -173,25 +173,25 @@ Experimental evidence suggests that this is not a problem.
 
 ## Additional Traffic Detection
 
-Switches will drop any packets for which no explicit path is installed, this
+Switches drop all packets for which no explicit paths are installed. This
 includes any flows from the additional traffic because they are not known
 beforehand.
 
 If detection of additional traffic is enabled, the switch will detect UDP
 packets on ports above 60000 and send them to the controller.
-The controller then solves an MCF problem on the residual capacity graph using
-all known additional traffic flows and link failures.
-The same as with the base traffic, solutions are converted into paths and
+The controller then solves an MCF problem on an approximate residual capacity
+graph (see section below) using all known additional traffic flows and link failures.
+As with the base traffic, solutions are converted into paths and
 installed on the switches.
 
 As soon as the paths are installed, the corresponding additional traffic
-packets are treated as regular traffic and forwarded according to the installed
-MPLS headers.
+packets are treated like any other traffic, i.e., the ingress switch adds the
+installed MPLS header stack and the packet is forwarded according to these labels.
 
 Any packets arriving in the interval between the controller receiving the
 first packet and the new paths being installed are also sent to the controller.
-The controller can additionally directly forward them using the appropriate
-MPLS headers so that they don't get lost.
+The controller can optionally add the appropriate MPLS headers in the control
+plane and send the packet back to the switch such that they are not lost.
 
 ### Calculation of Paths
 
@@ -200,10 +200,10 @@ residual graph after subtracting the base-traffic bandwidth demands.
 The residual graph is approximated as follows:
 
 * The bandwidth of each base-traffic flow is normalized over the entire 60 seconds time interval.
-* A single MCF for all normalized base-traffic flows is solved
+* A single MCF for all normalized base-traffic flows is solved.
 * The bandwidth requirements of all resulting paths are subtracted from the edge capacities in the base graph.
 
-Each detected additional traffic is assigned a bandwidth requirement of 10Mbps
+Each detected additional traffic flow is assigned a bandwidth requirement of 10Mbps
 (configurable) because the effective rate is not known and could be 10Mbps in
 the worst case.
 
@@ -213,12 +213,17 @@ Since we also don't know when an additional traffic flow ends, we periodically
 purge all detected additional flows and their associated table entries in the
 switch.
 
-If some traffic is still active, the switch will again send it to the
-controller and the controller will compute new paths.
+If some additional traffic flow is still active, the switch will send the next packet to the
+controller again and the controller will compute new paths.
 
-Having table entries for stale paths isn't a big deal, however stale flows in
-the MCF use up capacity and make it more difficult to solve, which could
-disadvantage still active flows.
+Having table entries for stale paths is no big deal, but stale flows in
+the MCF use up capacity which could otherwise be used for flows that are still active.
+
+### Enabling the feature
+In the code version we hand in, additional traffic detection is disabled because we find this to be the more promising option for the leaderboard :-) To enable the feature, you need to do three things:
+- In `controller.py`, select at least one of the SLAs for the additional traffic, e.g., `prr_31`.
+- In the same file, enable purging (if desired), by setting the parameter `additional_traffic_purge=True`.
+- In `switch.p4`, comment out the line `#define DO_ADDITIONAL 0`.
 
 ## Configurable Parameters
 

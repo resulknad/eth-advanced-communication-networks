@@ -15,7 +15,7 @@ The user selects a subset of the SLAs, which give rise to a set of (base traffic
 The simulation is divided into fixed-size intervals of a few seconds length.
 For each interval, the controller constructs an MCF problem consisting of the relevant base traffic flows.
 This global view allows us to approximate an optimal solution.
-The MCF problems are solved by means of Linear Programming, and the solutions are then converted into paths and installed on the switches.
+The MCF problems are solved by means of Linear Programming (LP), the solutions are then converted into paths and installed on the switches.
 
 In the forwarding plane, paths are added to the packets at the ingress switches in the form of an **MPLS header stack**.
 Forwarding is based on these labels, except for the last hop, which is IPv4 based.
@@ -24,7 +24,7 @@ Packets that do not belong to an installed path are dropped at the ingress switc
 The above approach is complemented by the following techniques:
 - **Failure detection**: Link state changes are detected using heartbeats and trigger a recomputation of the MCF solution.
 - **Additional Traffic**: If enabled, the switches detect additional traffic and forward it to the controller, which can then decide to install an appropriate path on the switch if the residual graph has sufficient capacity.
-- **Load balancing**: When the MCF solution distributes a flow among multiple paths, the ingress switch chooses a path uniformly at random at flowlet granularity. For UDP, every packet is considered its own flowlet.
+- **Load balancing**: When the MCF solution distributes a flow among multiple paths, the ingress switch chooses a path uniformly at random at flowlet (TCP) or packet (UDP) granularity.
 
 ## Individual Contributions
 
@@ -77,7 +77,7 @@ $`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -1`$
 
 If we require integer flows, so $`f_i: E \rightarrow N`$, then the MCF problem is NP-complete. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, the problem can be solve in polynomial time using linear programming.
 
-### Linear Program (LP)
+### Linear Program
 The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional.
 
 The number of constraints and variables is in $`O(k\cdot m)`$ where $`m`$ is the number of edges and $`k`$ the number of commodities.
@@ -145,10 +145,134 @@ We load balance across those paths using flowlet switching, or ECMP in the UDP c
 This might not respect the exact fractional solutions derived in our LP because paths are selected uniformly at random.
 Experimental evidence suggests that this is not a problem. 
 
+## Additional Traffic Detection
+
+Switches will drop any packets for which no explicit path is installed, this
+includes any flows from the additional traffic because they are not known
+beforehand.
+
+If detection of additional traffic is enabled, the switch will detect UDP
+packets on ports above 60000 and send them to the controller.
+The controller then solves an MCF problem on the residual capacity graph using
+all known additional traffic flows and link failures.
+The same as with the base traffic, solutions are converted into paths and
+installed on the switches.
+
+As soon as the paths are installed, the corresponding additional traffic
+packets are treated as regular traffic and forwarded according to the installed
+MPLS headers.
+
+Any packets arriving in the interval between the controller receiving the
+first packet and the new paths being installed are also sent to the controller.
+The controller can additionally directly forward them using the appropriate
+MPLS headers so that they don't get lost.
+
+### Calculation of Paths
+
+The MCF for all additional traffic flows is solved on an approximation of the
+residual graph after subtracting the base-traffic bandwidth demands.
+The residual graph is approximated as follows:
+
+* The bandwidth of each base-traffic flow is normalized over the entire 60 seconds time interval.
+* A single MCF for all normalized base-traffic flows is solved
+* The bandwidth requirements of all resulting paths are subtracted from the edge capacities in the base graph.
+
+Each detected additional traffic is assigned a bandwidth requirement of 10Mbps
+(configurable) because the effective rate is not known and could be 10Mbps in
+the worst case.
+
+### Deletion of Stale Paths
+
+Since we also don't know when an additional traffic flow ends, we periodically
+purge all detected additional flows and their associated table entries in the
+switch.
+
+If some traffic is still active, the switch will again send it to the
+controller and the controller will compute new paths.
+
+Having table entries for stale paths isn't a big deal, however stale flows in
+the MCF use up capacity and make it more difficult to solve, which could
+disadvantage still active flows.
+
 ## Configurable Parameters
+
+TODO
+
+### Selecting SLAs
 
 TODO
 
 ## Source Files
 
-TODO
+**`p4src/switch.p4`**:
+
+Main data-plane logic.
+Handles heartbeat messages, MPLS forwarding, flowlet switching, and additional
+traffic detection.
+
+**`p4src/include/headers.p4`**:
+
+Packet headers, metadata, and constants definitions.
+
+**`p4src/include/parsers.p4`**:
+
+Parsers and deparsers for supported packet headers: ethernet, ipv4, tcp, udp,
+mpls, and our custom heartbeat header.
+
+**`controllers/heartbeat_generator.py`**:
+
+Generates periodic heartbeat packets for failure detection.
+Copied from the solutions for exercise 7.
+
+**`controllers/graph.py`**:
+
+Data structure for representing a network graph modelling both per-edge
+bandwidth and delay.
+
+**`controllers/parameters.py`**:
+
+Definition of configurable parameters.
+
+**`controllers/commodity.py`**:
+
+Class definition for commodities used in MCF.
+
+**`controllers/table_manager.py`**:
+
+Maintains the table contents on all switches to allow for fast updates.
+
+**`controllers/flow.py`**:
+
+Class definition for a flow in the network.
+
+**`controllers/controller.py`**:
+
+Main controller logic.
+Handles heartbeats and additional traffic and uses the flow manager and table
+manager to calculate new paths and update the switches.
+
+**`controllers/node.py`**:
+
+Node class used in `graph.py`.
+
+**`controllers/flow_manager.py`**:
+
+Invokes the MCF class to find paths for each discrete time interval.
+
+**`controllers/mcf.py`**:
+
+Encodes our multi-commodity flow problem as a linear program and solves it
+using the PuLP python library.
+
+**`controllers/edge.py`**:
+
+Edge class used in `graph.py`, stores delay and bandwidth of an edge.
+
+**`controllers/flow_endpoint.py`**:
+
+Class definition representing an endpoint of a flow.
+Extensively used in the MCF class.
+
+**`controllers/test_mcf.py`**:
+
+Testcases for the MCF class.

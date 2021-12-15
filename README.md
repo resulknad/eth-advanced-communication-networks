@@ -204,75 +204,26 @@ TODO
 
 ## Source Files
 
-**`p4src/switch.p4`**:
-
-Main data-plane logic.
-Handles heartbeat messages, MPLS forwarding, flowlet switching, and additional
-traffic detection.
-
-**`p4src/include/headers.p4`**:
-
-Packet headers, metadata, and constants definitions.
-
-**`p4src/include/parsers.p4`**:
-
-Parsers and deparsers for supported packet headers: ethernet, ipv4, tcp, udp,
-mpls, and our custom heartbeat header.
-
-**`controllers/heartbeat_generator.py`**:
-
-Generates periodic heartbeat packets for failure detection.
-Copied from the solutions for exercise 7.
-
-**`controllers/graph.py`**:
-
-Data structure for representing a network graph modelling both per-edge
-bandwidth and delay.
-
-**`controllers/parameters.py`**:
-
-Definition of configurable parameters.
-
-**`controllers/commodity.py`**:
-
-Class definition for commodities used in MCF.
-
-**`controllers/table_manager.py`**:
-
-Maintains the table contents on all switches to allow for fast updates.
-
-**`controllers/flow.py`**:
-
-Class definition for a flow in the network.
-
-**`controllers/controller.py`**:
-
-Main controller logic.
-Handles heartbeats and additional traffic and uses the flow manager and table
-manager to calculate new paths and update the switches.
-
-**`controllers/node.py`**:
-
-Node class used in `graph.py`.
-
-**`controllers/flow_manager.py`**:
-
-Invokes the MCF class to find paths for each discrete time interval.
-
-**`controllers/mcf.py`**:
-
-Encodes our multi-commodity flow problem as a linear program and solves it
-using the PuLP python library.
-
-**`controllers/edge.py`**:
-
-Edge class used in `graph.py`, stores delay and bandwidth of an edge.
-
-**`controllers/flow_endpoint.py`**:
-
-Class definition representing an endpoint of a flow.
-Extensively used in the MCF class.
-
-**`controllers/test_mcf.py`**:
-
-Testcases for the MCF class.
+```
+.
+|-- controllers
+|   |-- parameters.py           // Definition of configurable parameters
+|   |-- controller.py           // Main file for the centralized controller
+|   |-- flow_manager.py         // Computes paths using mcf.py, used by controller.py
+|   |-- table_manager.py        // Installs paths on the switches, used by controller.py
+|   |-- heartbeat_generator.py  // Generates heartbeats for failure detection; copied from Ex. 7
+|   |-- mcf.py                  // Encodes the MCF problem as a LP, solves it and transforms it to paths
+|   |-- commodity.py            // Class definition for a commodity, used by mcf.py
+|   |-- flow_endpoint.py        // Class definition for a flow endpoint, used by mcf.py
+|   |-- flow.py                 // Class definition for a flow in the network
+|   |-- graph.py                // Data structure for representing a network graph
+|   |-- edge.py                 // Edge class used in graph.py
+|   |-- node.py                 // Node class used in graph.py
+|   `-- test_mcf.py             // Testcases for mcf.py
+|-- p4src
+|   |-- include
+|   |   |-- headers.p4          // Packet headers, metadata, and constant definitions
+|   |   `-- parsers.p4          // Parser and deparser for supported headers
+|   `-- switch.p4               // Main dataplane file, used by all switches
+`-- README.md
+```

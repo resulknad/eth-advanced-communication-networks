@@ -44,26 +44,27 @@ Implemented MPLS forwarding as well as the detection and integration of addition
 
 ## Linear Program Formulation
 ### Mutli-Commodity Flow Problem
-We start by defining what a multi commodity flow problem on a directed graph $`G = (V,E)`$ is.
+We start by defining what a multi-commodity flow (MCF) problem on a directed graph $`G = (V,E)`$ is.
 
-For each edge $`e \in E`$ we have some non-negative capacity $`c(e) = c(u,v)`$.
+For each edge $`e \in E`$, we have some non-negative capacity $`c(e) = c(u,v)`$.
 
-Furthermore we have $`k`$ commodities, each of them defined by the 4-tuple $`K_i = (s_i, t_i, d_i, p_i)`$ where $`s_i`$ is the source, $`t_i`$ the sink, $`d_i`$ the demand and $`p_i: E \rightarrow R`$ the Commodity's cost function describing the cost of sending some amount of flow over a specific edge. We will denote the actual flow of commodity $`i`$ on edge $`e=(u,v)`$ as $`f_i(u,v)`$.
+Furthermore, we have $`k`$ commodities, each of them defined by the 4-tuple $`K_i = (s_i, t_i, d_i, p_i)`$, where $`s_i`$ is the source, $`t_i`$ the sink, $`d_i`$ the demand and $`p_i: E \rightarrow R`$ the commodity's cost function describing the cost of sending some amount of flow over a specific edge. We will denote the actual flow of commodity $`i`$ on edge $`e=(u,v)`$ as $`f_i(u,v)`$.
 
 So intuitively, having a commodity $`K_i`$ requires a flow of $`d_i`$ units from source $`s_i`$ to $`t_i`$, while for every link we need to obey the capacity constraints.
 
-This intuiton translates to the following constrained optimization problem to minimize the total cost for all flows:
+This intuition translates to the following constrained optimization problem to minimize the total cost for all flows:
 
 **Objective:**
 
 ```math
 \min \sum_{i \in K} \sum_{(u,v) \in E} f_i(u,v) \cdot p_i(u,v)
 ```
+where $`K = \{1, \ldots, k\}`$.
 
 **Constraints:**
 
 1. **Link capacity:**
-$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v) \right) \leq c(u,v)`$
+$`\forall (u,v) \in E: \sum_{i \in K} f_i(u,v) \leq c(u,v)`$
 
 2. **Flow conservation (transit nodes):**
 $`\forall i \in K: \sum_{w\in V} f_i(u,w) - \sum_{w \in V} f_i(w,u) = 0 \text{ when } u \neq s_i, t_i`$
@@ -75,23 +76,23 @@ $`\forall i \in K: \sum_{w\in V} f_i(s_i,w) - \sum_{w \in V} f_i(w,s_i) = d_i`$
 $`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -d_i`$
 
 
-If we constrain our solutions to have one single flow per commodity, so $`f_i: E \rightarrow \{0,d_i\}`$, then the MCF problem is NP-complete. This is referred to as the decision version of the problem. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, so $`f_i: E \rightarrow [0,d_i]`$, the problem can be solved in polynomial time using linear programming.
+If we constrain our solutions to have a single flow per commodity, i.e., $`f_i: E \rightarrow \{0,d_i\}`$, then the MCF problem is NP-complete. This is referred to as the decision version of the problem. If we allow fractional flows, i.e., $`f_i: E \rightarrow [0,d_i]`$, the constraints of a single commodity might be satisfied by using multiple paths, but the problem can then be solved in polynomial time using linear programming.
 
 ### Linear Program (LP)
-The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional. Note that for any feasible solution, for all commodities $`i`$ and all edges $`e`$ we have $`f_i(e) = f_i(u,v) \leq d_i`$ by constraint (2,3 and 4). The intuition here is that if the flow were larger at any point, then it would also have to be larger everywhere in the flow (flow conservation) and thus also at the source and sink where it would violate both constraints 3 and 4.
+The above constraints translate in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional. Note that for any feasible solution, for all commodities $`i`$ and all edges $`e`$ we have $`f_i(e) = f_i(u,v) \leq d_i`$ by constraint (2, 3 and 4). The intuition here is that if the flow was larger at any point, then it would also have to be larger everywhere in the flow (flow conservation) and thus also at the source and sink where it would violate both constraints 3 and 4.
 
 The number of constraints and variables is in $`O(k\cdot m)`$ where $`m`$ is the number of edges and $`k`$ the number of commodities.
 
 ### Excess / Slack
-Right now the LP is feasible only if all of the commodities demands can be satisfied. Since we are also interested in a solution satisfying only a part of our requirements, we introduce slack variables (edges) to our LP (as in [1]).
+So far, the LP is feasible only if all of the commodities' demands can be satisfied. Since we are also interested in a solution satisfying only a part of our requirements, we introduce slack variables (edges) to our LP (as in [1]).
 
-For every commodity we add an edge $`(s_i, t_i)`$, with cost $`p_i(s_i,t_i) = \infty`$. Now our LP is always feasible, but it will only use those excess edges as a last ressort due to the huge cost.
+For every commodity, we add an edge $`(s_i, t_i)`$, with cost $`p_i(s_i,t_i) = \infty`$. Now our LP is always feasible, but it will only use those excess edges as a last resort due to the huge cost.
 
 [1]: Suri S., Waldvogel M., Warkhede P.R. (2001) Profile-Based Routing: A New Framework for MPLS Traffic Engineering.
 
 
 ### Mapping flows to LPs
-We start with the graph $`G`$ as defined in our network topology. The capacity of every edge is given by the bandwidth defined in the toplogy. Let us now show how some TCP flow `shost:sport -> dhost:dport` with demand $`d`$ is represented in our MCF:
+We start with the graph $`G`$ as defined in our network topology. The capacity of every edge is given by the bandwidth defined in the toplogy. Let us now show how some TCP flow `shost:sport -> dhost:dport` with demand $`d`$ is represented in our MCF problem:
 
 For both flow endpoints (`shost:sport:TCP`) and (`dhost:dport:TCP`), we add a new node to our graph, each connected to the respective host node (`shost`) and (`dhost`) with infinite capacity and zero cost edges.
 
@@ -113,24 +114,24 @@ d_{i+1} = d\cdot \textit{TCP\_ack\_factor}\\
 p_{i+1}(u,v) = \textit{cost\_multiplier} \cdot \textit{delay(u,v)}
 ```
 
-Where we reduce the reverse flows bandwidth by the $`\textit{TCP\_ack\_factor} = 0.5`$ because most of our transfer is nothing but acks in one direction of the flow. 
+Note that we reduce the bandwidth of the reverse flow by the $`\textit{TCP\_ack\_factor} = 0.5`$ because the acknowledgements require less bandwidth than the transfer flow itself. 
 
-The parameter $`\textit{cost\_multiplier}`$ allows to incentivize solutions which have smaller delays for certain flows. It may make sense to set the cost multiplier to some high value for flows which have associated delay SLAS which we are trying to fulfill.
+The parameter $`\textit{cost\_multiplier}`$ allows to incentivize solutions which have smaller delays for certain flows. It may make sense to set the cost multiplier to some high value for flows which have associated delay SLAs which we are trying to fulfill.
 
-Note that for UDP flows we do the same exact thing, but without the reverse channel commodity.
+Note that for UDP flows we do the same exact thing, but without the reverse direction commodity.
 
 ### Waypointing
-We may directly add the waypointing as a further constraint to our LP. Let us asusme we want to waypoint some commodity $`(s_i,t_i,d_i,p_i)`$ to route via waypoint $`w`$.
+We may directly add waypointing as a further constraint to our LP. Let us assume we want to waypoint some commodity $`(s_i,t_i,d_i,p_i)`$ to route via waypoint $`w`$.
 
-The requirement is simple: every flow in our soluton for commodity $`i`$ must go through $`w`$.
+The requirement is simple: every flow in our solution for commodity $`i`$ must go through $`w`$.
 
-For this we split the commodity $`i`$ in two commodities $`j`$ and $`j+1`$:
+For this we split the commodity $`i`$ into two commodities $`j`$ and $`j+1`$:
 
 ```math
 K_j = (s_i, w, d_i, p_i) \text{ and } K_{j+1} = (w, t_i, d_i, p_i)
 ```
 
-to prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ but cannot reach $`t_i`$ from there because $`K_{j+1}`$ could not be satisfied, we add a constraint on the excess variables:
+To prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ but cannot reach $`t_i`$ from there because $`K_{j+1}`$ could not be satisfied, we add a constraint on the excess variables:
 
 ```math
 \textit{excess}_j = \textit{excess}_{j+1}
@@ -139,11 +140,10 @@ to prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ b
 This ensures that in every feasible solution if we have a flow of $`x`$ units from $`s_i`$ to $`w`$, we also have a flow of $`x`$ units from $`w`$ to $`t_i`$.
 
 ### Fractional Flows
-Our solution does return fractional flows. This means for some flow we have multiple paths each taking a different fraction of the flow.
-We load balance across those paths using flowlet switching, or ECMP in the UDP case.
+Our solution might return fractional flows. This means for some flow we might have multiple paths, each taking a different fraction of the flow.
+We load balance across those paths by selecting one uniformly at random an the ingress switch. This selection is performed at a flowlet granularity for TCP flows and at a packet granularity for UDP flows.
 
-This might not respect the exact fractional solutions derived in our LP because paths are selected uniformly at random.
-Experimental evidence suggests that this is not a problem. 
+While this might not respect the exact fractional solutions derived in our LP, experimental evidence suggests that this is not a big problem. 
 
 ## Configurable Parameters
 

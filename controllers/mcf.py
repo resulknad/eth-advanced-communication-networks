@@ -12,6 +12,9 @@ EXCESS_EDGE_COST = 2**16
 
 
 class MCF:
+    """Represents an instance of a multi-commodity flow problem. Exposes methods to add the commodities, constraints,
+    convert it to an LP, solve that LP and extract the paths from the solution."""
+    
     def __init__(self, graph):
         """Initializes a new MCF (Multi-Commodity Flow) problem on the graph given in the constructor
 

@@ -131,7 +131,7 @@ For this we split the commodity $`i`$ into two commodities $`j`$ and $`j+1`$:
 K_j = (s_i, w, d_i, p_i) \text{ and } K_{j+1} = (w, t_i, d_i, p_i)
 ```
 
-To prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ but cannot reach $`t_i`$ from there because $`K_{j+1}`$ could not be satisfied, we add a constraint on the excess variables. Excess variables correspond to the flows on the excess edges which were added to guarantee feasibility: $`excess_i = f(s_i, t_i)`$.
+To prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ but cannot reach $`t_i`$ from there because $`K_{j+1}`$ could not be satisfied, we add a constraint on the excess variables. Excess variables correspond to the flows on the excess edges which were added to guarantee feasibility: $`\textit{excess}_i = f(s_i, t_i)`$.
 
 **Waypointing Constraint**
 ```math

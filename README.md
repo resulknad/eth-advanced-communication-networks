@@ -86,7 +86,7 @@ The number of constraints and variables is in $`O(k\cdot m)`$ where $`m`$ is the
 ### Excess / Slack
 So far, the LP is feasible only if all of the commodities' demands can be satisfied. Since we are also interested in a solution satisfying only a part of our requirements, we introduce slack variables (edges) to our LP (as in [1]).
 
-For every commodity, we add an edge $`(s_i, t_i)`$, with cost $`p_i(s_i,t_i) = \infty`$. Now our LP is always feasible, but it will only use those excess edges as a last resort due to the huge cost.
+For every commodity, we add an edge $`(s_i, t_i)`$ with infinite capacity and cost $`p_i(s_i,t_i) = \infty`$. Now our LP is always feasible, but it will only use those excess edges as a last resort due to the huge cost.
 
 [1]: Suri S., Waldvogel M., Warkhede P.R. (2001) Profile-Based Routing: A New Framework for MPLS Traffic Engineering.
 

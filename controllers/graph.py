@@ -6,6 +6,8 @@ INFINITE_BW = 2**32
 
 
 class Graph:
+    """Represents a directed graph G=(V,E). Exposes methods to manipulate graph."""
+
     edges = []
     nodes = {}
 

@@ -48,13 +48,13 @@ We start by defining what a multi commodity flow problem on a directed graph $`G
 
 For each edge $`e \in E`$ we have some non-negative capacity $`c(e) = c(u,v)`$.
 
-Furthermore we have $`k`$ commodities, each of them defined by the 3-tuple $`K_i = (s_i, t_i, d_i, p_i)`$ where $`s_i`$ is the source, $`t_i`$ the sink, $`d_i`$ the demand and $`p_i: E \rightarrow R`$ the commodities cost function describing the cost of sending some amount of flow over a specific edge. We will denote the actual flow of commodity $`i`$ on edge $`e=(u,v)`$ as $`f_i(u,v)`$.
+Furthermore we have $`k`$ commodities, each of them defined by the 4-tuple $`K_i = (s_i, t_i, d_i, p_i)`$ where $`s_i`$ is the source, $`t_i`$ the sink, $`d_i`$ the demand and $`p_i: E \rightarrow R`$ the Commodity's cost function describing the cost of sending some amount of flow over a specific edge. We will denote the actual flow of commodity $`i`$ on edge $`e=(u,v)`$ as $`f_i(u,v)`$.
 
-So intuitively having a commodity $`K_i`$ requires a flow of $`d_i`$ units from source $`s_i`$ to $`t_i`$, while for every link we need to obey the capacity constraints.
+So intuitively, having a commodity $`K_i`$ requires a flow of $`d_i`$ units from source $`s_i`$ to $`t_i`$, while for every link we need to obey the capacity constraints.
 
-This intuiton translates to the following constrained optimization problem:
+This intuiton translates to the following constrained optimization problem to minimize the total cost for all flows:
 
-**Objective**
+**Objective:**
 
 ```math
 \min \sum_{i \in K} \sum_{(u,v) \in E} f_i(u,v) \cdot p_i(u,v)
@@ -62,22 +62,22 @@ This intuiton translates to the following constrained optimization problem:
 
 **Constraints:**
 
-**(1) Link capacity:**
-$`\forall (u,v) \in E: \sum_{i}^k f_i(u,v) \leq c(u,v)`$
+1. **Link capacity:**
+$`\forall (u,v) \in E: \left(\sum_{i}^k f_i(u,v)\right) \leq c(u,v)`$
 
-**(2) Flow conservation (transit nodes):**
+2. **Flow conservation (transit nodes):**
 $`\forall i \in K: \sum_{w\in V} f_i(u,w) - \sum_{w \in V} f_i(w,u) = 0 \text{ when } u \neq s_i, t_i`$
 
-**(3) Flow conservation (source node)**
+3. **Flow conservation (source node)**
 $`\forall i \in K: \sum_{w\in V} f_i(s_i,w) - \sum_{w \in V} f_i(w,s_i) = 1`$
 
-**(4) Flow conservation (sink node)**
+4. **Flow conservation (sink node)**
 $`\forall i \in K: \sum_{w\in V} f_i(t_i,w) - \sum_{w \in V} f_i(w,t_i) = -1`$
 
 
 If we require integer flows, so $`f_i: E \rightarrow N`$, then the MCF problem is NP-complete. For fractional flows, which means that the constraints of a single commodity might be satisfied by using multiple paths, the problem can be solve in polynomial time using linear programming.
 
-### Linear Program
+### Linear Program (LP)
 The above constraints transfer in a straightforward manner to a linear program. Simply introduce a variable for each $`f_i(u,v)`$ and allow it to be fractional.
 
 The number of constraints and variables is in $`O(k\cdot m)`$ where $`m`$ is the number of edges and $`k`$ the number of commodities.
@@ -91,9 +91,9 @@ For every commodity we add an edge $`(s_i, t_i)`$, with cost $`p_i(s_i,t_i) = \i
 
 
 ### Mapping flows to LPs
-We start with the graph $`G`$ as defined in our network topology. The capacity of every edge is given by the bandwidth defined in the toplogy. Let us now show how some TCP flow shost:sport -> dhost:dport with demand $`d`$ is represented in our MCF:
+We start with the graph $`G`$ as defined in our network topology. The capacity of every edge is given by the bandwidth defined in the toplogy. Let us now show how some TCP flow `shost:sport -> dhost:dport` with demand $`d`$ is represented in our MCF:
 
-For both flowendpoints (shost:sport:TCP) and (dhost:dport:TCP) we add a new node to our graph, each connected to the respective host node (shost) and (dhost) with infinite capacity and zero cost edges.
+For both flow endpoints (`shost:sport:TCP`) and (`dhost:dport:TCP`), we add a new node to our graph, each connected to the respective host node (`shost`) and (`dhost`) with infinite capacity and zero cost edges.
 
 We then need two commodities:
 
@@ -113,7 +113,7 @@ d_{i+1} = d\cdot \textit{TCP\_ack\_factor}\\
 p_{i+1}(u,v) = \textit{cost\_multiplier} \cdot \textit{delay(u,v)}
 ```
 
-Where we reduce the reverse flows bandwidth by the $`\textit{TCP\_ack\_factor} = 0.5`$ because most of our transfer nothing but acks in one direction of the flow. 
+Where we reduce the reverse flows bandwidth by the $`\textit{TCP\_ack\_factor} = 0.5`$ because most of our transfer is nothing but acks in one direction of the flow. 
 
 The parameter $`\textit{cost\_multiplier}`$ allows to incentivize solutions which have smaller delays for certain flows. It may make sense to set the cost multiplier to some high value for flows which have associated delay SLAS which we are trying to fulfill.
 
@@ -139,9 +139,11 @@ to prevent a situation where we have a flow from $`s_i`$ to the waypoint $`w`$ b
 This ensures that in every feasible solution if we have a flow of $`x`$ units from $`s_i`$ to $`w`$, we also have a flow of $`x`$ units from $`w`$ to $`t_i`$.
 
 ### Fractional Flows
-Our solution does return fractional flows. This means for some flow we have multiple paths. We load balance across those paths using flowlet switching, or ECMP in the UDP case.
+Our solution does return fractional flows. This means for some flow we have multiple paths each taking a different fraction of the flow.
+We load balance across those paths using flowlet switching, or ECMP in the UDP case.
 
-This might not respect the exact fractional solutions derived in our LP. Experimental evidence suggests that this is not a problem. 
+This might not respect the exact fractional solutions derived in our LP because paths are selected uniformly at random.
+Experimental evidence suggests that this is not a problem. 
 
 ## Configurable Parameters
 

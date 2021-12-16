@@ -246,7 +246,7 @@ Our controller exposes a multitude of configuration options. While we set sensib
 We give a brief overview of the parameters (and default values) here, with a focus on the tradeoffs. Please also refer to the description of the parameters in `controllers/parameters.py`.
 
 ```
-p4src/switch.py:
+p4src/switch.p4:
     FLOWLET_TIMEOUT=48w200000 (microseconds)
         Threshold when a new TCP flowlet starts. Lower value might allow for faster reaction to congestion,
         but also leads to more reordering within TCP flows.

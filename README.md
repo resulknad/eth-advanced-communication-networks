@@ -237,7 +237,7 @@ Note, however, the following limitations of SLA selection:
   For example, it does not matter whether it is a flow completion _time_ or flow completion _rate_ SLA.
   In either case, all flows affected by the SLAs will be treated equally.
 - It is not possible to consider SLAs only up to a particular target value.
-  For example, including the SLA `prr_26` is equivalent to including any non-empty combination of the slas `prr_26`, `prr_27`, and `prr_28`.
+  For example, including the SLA `prr_26` is equivalent to including any non-empty combination of the SLAs `prr_26`, `prr_27`, and `prr_28`.
 
 ## Configurable Parameters
 

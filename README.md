@@ -231,13 +231,15 @@ In the code version we hand in, additional traffic detection is disabled because
 The user can select a set of SLAs that the controller should try to satisfy.
 This is done by including the names of the selected SLAs in the `slas` parameter in `controller.py`.
 
-The controller then includes all flows to which a selected SLA applies in its MCF computation.
+The controller then includes all base-traffic flows to which a selected SLA applies in its MCF computation.
 Note, however, the following limitations of SLA selection:
 - The type of the SLA is not considered.
   For example, it does not matter whether it is a flow completion _time_ or flow completion _rate_ SLA.
-  In either case, all flows affected by the SLAs will be treated equally.
-- It is not possible to consider SLAs only up to a particular target value.
-  For example, including the SLA `prr_26` is equivalent to including any non-empty combination of the SLAs `prr_26`, `prr_27`, and `prr_28`.
+- The type of the SLA is not considered (except for waypointing).
+  For example, it does not matter whether it is a flow completion _time_ or flow completion _rate_ SLA.
+  An SLA only determines which flows in the base-traffic are added to the MCF and the MCF will try its best to allocate bandwidth for that flow without any formal guarantees around delay or packet-reception-rate.
+- As such, it is not possible to consider SLAs only up to a particular target value.
+  For example, including the SLA `prr_26` is equivalent to including any other SLA with the same protocol and port ranges (like `prr_27` or `prr_28`).
 
 ## Configurable Parameters
 
@@ -298,9 +300,10 @@ controllers/controller.py:
         The assumed bandwidth demand of additional traffic flows. Lower value wastes less bandwidth for
         small additional traffic flows, but may lead to congestion if the true demand is higher.
     controller_forward_mpls=True
-        Whether the controller should add MPLS headers in the control plane and recirculate the packet
-        during the period where there are no paths installed for an additional traffic flow. Disabling this
-        decreases the load on the controller, but leads to more packet loss for additional traffic flows.
+        Whether the controller should add MPLS headers in the control plane and forward the packet to the 
+        appropriate output port during the period where there are no paths installed for an additional
+        traffic flow. Disabling this decreases the load on the controller, but leads to more packet loss
+        for additional traffic flows.
     additional_traffic_purge_interval=5 (seconds)
         The interval at which additional traffic flow paths are purge from the switches. Higher value
         decreases load on both the switches and controller, but leads to more wasted bandwidth.

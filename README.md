@@ -15,7 +15,7 @@ The user selects a subset of the SLAs, which give rise to a set of (base traffic
 The simulation is divided into fixed-size intervals of a few seconds length.
 For each interval, the controller constructs an MCF problem consisting of the relevant base traffic flows.
 This global view allows us to approximate an optimal solution.
-The MCF problems are solved by means of Linear Programming, and the solutions are then converted into paths and installed on the switches.
+The MCF problems are solved by means of Linear Programming (LP), the solutions are then converted into paths and installed on the switches.
 
 In the forwarding plane, paths are added to the packets at the ingress switches in the form of an **MPLS header stack**.
 Forwarding is based on these labels, except for the last hop, which is IPv4 based.
@@ -24,7 +24,7 @@ Packets that do not belong to an installed path are dropped at the ingress switc
 The above approach is complemented by the following techniques:
 - **Failure detection**: Link state changes are detected using heartbeats and trigger a recomputation of the MCF solution.
 - **Additional Traffic**: If enabled, the switches detect additional traffic and forward it to the controller, which can then decide to install an appropriate path on the switch if the residual graph has sufficient capacity.
-- **Load balancing**: When the MCF solution distributes a flow among multiple paths, the ingress switch chooses a path uniformly at random at flowlet granularity. For UDP, every packet is considered its own flowlet.
+- **Load balancing**: When the MCF solution distributes a flow among multiple paths, the ingress switch chooses a path uniformly at random at flowlet (TCP) or packet (UDP) granularity.
 
 ## Individual Contributions
 
@@ -41,6 +41,32 @@ Devised the MCF approach, formulated the Linear Program and implemented the inte
 Implemented MPLS forwarding as well as the detection and integration of additional traffic flows. Refactored the controller for modularity and extensibility.
 
 # Additional Information
+
+## Source Files
+
+```
+.
+|-- controllers
+|   |-- parameters.py           // Definition of configurable parameters
+|   |-- controller.py           // Main file for the centralized controller
+|   |-- flow_manager.py         // Computes paths using mcf.py, used by controller.py
+|   |-- table_manager.py        // Installs paths on the switches, used by controller.py
+|   |-- heartbeat_generator.py  // Generates heartbeats for failure detection; copied from Ex. 7
+|   |-- mcf.py                  // Encodes the MCF problem as a LP, solves it and transforms it to paths
+|   |-- commodity.py            // Class definition for a commodity, used by mcf.py
+|   |-- flow_endpoint.py        // Class definition for a flow endpoint, used by mcf.py
+|   |-- flow.py                 // Class definition for a flow in the network
+|   |-- graph.py                // Data structure for representing a network graph
+|   |-- edge.py                 // Edge class used in graph.py
+|   |-- node.py                 // Node class used in graph.py
+|   `-- test_mcf.py             // Testcases for mcf.py
+|-- p4src
+|   |-- include
+|   |   |-- headers.p4          // Packet headers, metadata, and constant definitions
+|   |   `-- parsers.p4          // Parser and deparser for supported headers
+|   `-- switch.p4               // Main dataplane file, used by all switches
+`-- README.md
+```
 
 ## Linear Program Formulation
 ### Mutli-Commodity Flow Problem
@@ -146,10 +172,64 @@ We load balance across those paths by selecting one uniformly at random an the i
 
 While this might not respect the exact fractional solutions derived in our LP, experimental evidence suggests that this is not a big problem. 
 
+## Additional Traffic Detection
+
+Switches drop all packets for which no explicit paths are installed. This
+includes any flows from the additional traffic because they are not known
+beforehand.
+
+If detection of additional traffic is enabled, the switch will detect UDP
+packets on ports above 60000 and send them to the controller.
+The controller then solves an MCF problem on an approximate residual capacity
+graph (see section below) using all known additional traffic flows and link failures.
+As with the base traffic, solutions are converted into paths and
+installed on the switches.
+
+As soon as the paths are installed, the corresponding additional traffic
+packets are treated like any other traffic, i.e., the ingress switch adds the
+installed MPLS header stack and the packet is forwarded according to these labels.
+
+Any packets arriving in the interval between the controller receiving the
+first packet and the new paths being installed are also sent to the controller.
+The controller can optionally add the appropriate MPLS headers in the control
+plane and send the packet back to the switch such that they are not lost.
+
+### Calculation of Paths
+
+The MCF for all additional traffic flows is solved on an approximation of the
+residual graph after subtracting the base-traffic bandwidth demands.
+The residual graph is approximated as follows:
+
+* The bandwidth of each base-traffic flow is normalized over the entire 60 seconds time interval.
+* A single MCF for all normalized base-traffic flows is solved.
+* The bandwidth requirements of all resulting paths are subtracted from the edge capacities in the base graph.
+
+Each detected additional traffic flow is assigned a bandwidth requirement of 10Mbps
+(configurable) because the effective rate is not known and could be 10Mbps in
+the worst case.
+
+### Deletion of Stale Paths
+
+Since we also don't know when an additional traffic flow ends, we periodically
+purge all detected additional flows and their associated table entries in the
+switch.
+
+If some additional traffic flow is still active, the switch will send the next packet to the
+controller again and the controller will compute new paths.
+
+Having table entries for stale paths is no big deal, but stale flows in
+the MCF use up capacity which could otherwise be used for flows that are still active.
+
+### Enabling the feature
+In the code version we hand in, additional traffic detection is disabled because we find this to be the more promising option for the leaderboard :-) To enable the feature, you need to do three things:
+- In `controller.py`, select at least one of the SLAs for the additional traffic, e.g., `prr_31`.
+- In the same file, enable purging (if desired), by setting the parameter `additional_traffic_purge=True`.
+- In `switch.p4`, comment out the line `#define DO_ADDITIONAL 0`.
+
 ## Configurable Parameters
 
 TODO
 
-## Source Files
+### Selecting SLAs
 
 TODO

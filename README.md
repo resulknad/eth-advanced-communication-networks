@@ -226,10 +226,87 @@ In the code version we hand in, additional traffic detection is disabled because
 - In the same file, enable purging (if desired), by setting the parameter `additional_traffic_purge=True`.
 - In `switch.p4`, comment out the line `#define DO_ADDITIONAL 0`.
 
+## Selecting SLAs
+
+The user can select a set of SLAs that the controller should try to satisfy.
+This is done by including the names of the selected SLAs in the `slas` parameter in `controller.py`.
+
+The controller then includes all flows to which a selected SLA applies in its MCF computation.
+Note, however, the following limitations of SLA selection:
+- The type of the SLA is not considered.
+  For example, it does not matter whether it is a flow completion _time_ or flow completion _rate_ SLA.
+  In either case, all flows affected by the SLAs will be treated equally.
+- It is not possible to consider SLAs only up to a particular target value.
+  For example, including the SLA `prr_26` is equivalent to including any non-empty combination of the slas `prr_26`, `prr_27`, and `prr_28`.
+
 ## Configurable Parameters
 
-TODO
+Our controller exposes a multitude of configuration options. While we set sensible defaults, different choices lead to different tradeoffs, which may be preferred depending on the situation.
 
-### Selecting SLAs
+We give a brief overview of the parameters (and default values) here, with a focus on the tradeoffs. Please also refer to the description of the parameters in `controllers/parameters.py`.
 
-TODO
+```
+p4src/switch.py:
+    FLOWLET_TIMEOUT=48w200000 (microseconds)
+        Threshold when a new TCP flowlet starts. Lower value might allow for faster reaction to congestion,
+        but also leads to more reordering within TCP flows.
+    FAILURE_THRESHOLD=48w500000 (microseconds)
+        Threshold after which a link is considered failed if no heartbeats are received. Lower value leads
+        to faster detection of failures, but also to a higher false positive rate.
+    DO_ADDITIONAL=0 (boolean, 0 or 1)
+        Whether detected additional traffic should be reported to the controller.
+
+controllers/controller.py:
+    total_time=60 (seconds)
+        The total duration of the simulation.
+    mcf_interval_size=5 (seconds)
+        The size of time intervals for which an MCF problem is solved. Lower value leads to a better
+        approximation of the bandwidth demands at a particular point in time, but increases the
+        computational cost at the beginning and for link state changes.
+    normalize_bw_across_time=False
+        Whether flows that are active only during a part of a time interval should be normalized as
+        if they spanned the entire interval. Enabling this might lead to less wasted bandwidth, but
+        may also increase congestion.
+    tcp_default_bw=10 (Mbps)
+        The bandwidth demand that is assumed for (size-based) TCP flows. Lower value might allow to
+        accommodate more flows, but generally leads to more congestion.
+    udp_cost_multiplier=1
+        A multiplier for the cost of UDP flows. Higher value prioritizes short paths for UDP flows
+        relative to TCP flows.
+    tcp_cost_multiplier=1
+        Same for TCP flows.
+    udp_bw_multiplier=1
+        A multiplier for the bandwidth demand of UDP flows. A value >1 means that some spare capacity
+        will be allocated for UDP flows, which reduces congestion but might waste bandwidth.
+    tcp_bw_multiplier=1
+        Same for TCP flows.
+    tcp_ack_bw_multiplier=0.5
+        Determines the bandwidth demand for the reverse direction of a TCP flow. Lower value saves
+        bandwidth but may lead to lost ACKs, which lead to unnecessary retransmissions.
+    use_num_hops_cost=False
+        Use the hop count instead of delay as the cost measure in the MCF problem. Enabling this generally
+        leads to shorter paths in terms of hop count, which reduces the number of switches involved, but
+        may increase the length of the path in terms of delay.
+    heartbeat_frequency=0.1 (seconds)
+        The time interval between heartbeat messages. Lower value (together with a lower value of
+        FAILURE_THRESHOLD in switch.py) leads to faster failure detection, but increases the overhead in
+        the network.
+    tcp_duration_multiplier=1.5
+        A multiplier on the estimated duration of (size-based) TCP flows. Note that the same effect could
+        be achieved by changing the tcp_default_bw parameter.
+    additional_traffic_bw=10 (Mbps)
+        The assumed bandwidth demand of additional traffic flows. Lower value wastes less bandwidth for
+        small additional traffic flows, but may lead to congestion if the true demand is higher.
+    controller_forward_mpls=True
+        Whether the controller should add MPLS headers in the control plane and recirculate the packet
+        during the period where there are no paths installed for an additional traffic flow. Disabling this
+        decreases the load on the controller, but leads to more packet loss for additional traffic flows.
+    additional_traffic_purge_interval=5 (seconds)
+        The interval at which additional traffic flow paths are purge from the switches. Higher value
+        decreases load on both the switches and controller, but leads to more wasted bandwidth.
+    additional_traffic_purge=False
+        Whether to purge installed additional traffic flows at a regular interval (specified by the
+        additional_traffic_purge_interval parameter above).
+    slas=[...] (list of strings)
+        The names of the SLAs that the controller should try to satisfy (see above).
+```

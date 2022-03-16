@@ -2,11 +2,11 @@
 
 ## Group info
 
-| Group name | 05_Dijkstra     |          |                          |
-| ---------- | --------------- | -------- | ------------------------ |
-| Member 1   | Lukas Heimes    | heimesl  | heimesl@student.ethz.ch  |
-| Member 2   | Dan Kluser      | dkluser  | dkluser@student.ethz.ch  |
-| Member 3   | Patrick Ziegler | zieglerp | zieglerp@student.ethz.ch |
+| Group name | 05_Dijkstra                                         |
+| ---------- | --------------------------------------------------- |
+| Member 1   | [Lukas Heimes](https://github.com/lheimes)          |
+| Member 2   | [Dan Kluser](https://github.com/resulknad)          |
+| Member 3   | [Patrick Ziegler](https://github.com/patrick96)     |
 
 ## Overview
 
